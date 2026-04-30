@@ -14,10 +14,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow, Typography, scale, vscale } from '../../constants/Theme';
-import { setAuthenticated } from '../../stores/authStore';
+import { useAuthStore } from '../../stores/authStore';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { login, isLoading } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,7 +27,7 @@ export default function LoginScreen() {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [generalError, setGeneralError] = useState('');
 
   const passwordRef = useRef<TextInput>(null);
   const canSubmit = email.trim().length > 0 && password.trim().length > 0;
@@ -51,15 +52,18 @@ export default function LoginScreen() {
     return valid;
   };
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     if (isLoading || !canSubmit) return;
     if (!validate()) return;
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setAuthenticated(true);
+    
+    setGeneralError('');
+    const { success, error } = await login(email, password);
+    
+    if (success) {
       router.replace('/(tabs)/explore');
-    }, 900);
+    } else {
+      setGeneralError(error || 'Login failed. Please try again.');
+    }
   };
 
   const handleSignUp = () => {
@@ -92,6 +96,13 @@ export default function LoginScreen() {
         <View style={s.card}>
           <Text style={s.heading}>Welcome Back</Text>
           <Text style={s.subtext}>Continue your journey across the peaks.</Text>
+
+          {!!generalError && (
+            <View style={s.errorCard}>
+              <Ionicons name="alert-circle" size={16} color={Colors.error} />
+              <Text style={s.errorText}>{generalError}</Text>
+            </View>
+          )}
 
           <View style={s.fieldGroup}>
             <Text style={s.fieldLabel}>EMAIL ADDRESS</Text>
@@ -186,7 +197,7 @@ export default function LoginScreen() {
             accessibilityRole="button"
             accessibilityLabel="Continue with Google"
           >
-            <Ionicons name="logo-google" size={18} color={Colors.match} />
+            <Ionicons name="logo-google" size={18} color="#EA4335" />
             <Text style={s.googleBtnText}>Google</Text>
           </TouchableOpacity>
 
@@ -299,7 +310,7 @@ const s = StyleSheet.create({
     height: 52, borderRadius: Radius.full,
     borderWidth: 1.5, borderColor: Colors.border,
     backgroundColor: Colors.bgCard,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9,
   },
   googleBtnText: { ...Typography.bodySm, fontWeight: '600', color: Colors.textSecondary },
   devSkipBtn: { alignItems: 'center', marginTop: vscale(14), minHeight: 44, justifyContent: 'center' },
@@ -307,6 +318,13 @@ const s = StyleSheet.create({
   signUpRow: { alignItems: 'center', marginBottom: vscale(14), minHeight: 44, justifyContent: 'center' },
   signUpBase: { ...Typography.caption, color: Colors.textMuted, textAlign: 'center' },
   signUpLink: { color: Colors.brand, fontWeight: '700', textDecorationLine: 'underline' },
+    errorCard: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      backgroundColor: '#FEE5E5', borderRadius: Radius.md,
+      paddingHorizontal: scale(12), paddingVertical: vscale(10),
+      marginBottom: vscale(16),
+    },
+    errorText: { ...Typography.caption, color: Colors.error, flex: 1 },
   footer: {
     ...Typography.caption,
     color: Colors.textMuted, letterSpacing: 1.2,

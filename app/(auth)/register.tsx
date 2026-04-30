@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { Animated } from 'react-native';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -13,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow, Spacing, Typography, scale, vscale } from '../../constants/Theme';
-import { setAuthenticated } from '../../stores/authStore';
+import { useAuthStore } from '../../stores/authStore';
 
 type Role = 'traveler' | 'agency';
 
@@ -48,10 +49,13 @@ function validate(role: Role, t: TravelerFields, a: AgencyFields): FieldErrors {
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const { register, isLoading: authIsLoading } = useAuthStore();
   const [role, setRole] = useState<Role>('traveler');
-  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [showPass, setShowPass] = useState(false);
+  const [generalError, setGeneralError] = useState('');
+  const [showCreated, setShowCreated] = useState(false);
+  const createdAnim = useRef(new Animated.Value(0)).current;
 
   const [tFields, setTFields] = useState<TravelerFields>({ name: '', email: '', password: '', confirm: '' });
   const [aFields, setAFields] = useState<AgencyFields>({
@@ -72,16 +76,37 @@ export default function RegisterScreen() {
     if (errors[key]) setErrors((prev) => { const n = { ...prev }; delete n[key]; return n; });
   };
 
-  const handleSubmit = () => {
-    if (isLoading) return;
+  const handleSubmit = async () => {
+    if (authIsLoading) return;
     const errs = validate(role, tFields, aFields);
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setAuthenticated(true);
-      router.replace('/(tabs)/explore');
-    }, 1000);
+
+    const email = role === 'traveler' ? tFields.email : aFields.email;
+    const password = role === 'traveler' ? tFields.password : aFields.password;
+    const userData = role === 'traveler'
+      ? { name: tFields.name, role: 'traveler' }
+      : { agencyName: aFields.agencyName, role: 'agency', contactPerson: aFields.contactPerson, officeAddress: aFields.officeAddress };
+
+    setGeneralError('');
+    const res: any = await register(email, password, userData);
+
+    if (res.success) {
+      if (res.requireLogin) {
+        // show non-blocking success confirmation and then navigate to login
+        setShowCreated(true);
+        Animated.timing(createdAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+        // keep banner visible longer (2.5s) then animate out and navigate
+        setTimeout(() => {
+          Animated.timing(createdAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
+            router.replace('/(auth)/login');
+          });
+        }, 2500);
+      } else {
+        router.replace('/(tabs)/explore');
+      }
+    } else {
+      setGeneralError(res.error || 'Registration failed. Please try again.');
+    }
   };
 
   return (
@@ -93,7 +118,18 @@ export default function RegisterScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={s.backBtn}>
+          <TouchableOpacity
+            onPress={() => {
+              try {
+                if (typeof router.back === 'function') router.back();
+                else router.replace('/(auth)');
+              } catch (_) {
+                router.replace('/(auth)');
+              }
+            }}
+            hitSlop={12}
+            style={s.backBtn}
+          >
             <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
@@ -269,22 +305,47 @@ export default function RegisterScreen() {
         )}
 
         <TouchableOpacity
-          style={[s.submitBtn, isLoading && s.submitBtnDisabled]}
+          style={[s.submitBtn, authIsLoading && s.submitBtnDisabled]}
           onPress={handleSubmit}
-          disabled={isLoading}
+          disabled={authIsLoading}
           accessibilityLabel="Create account"
         >
-          {isLoading
+          {authIsLoading
             ? <ActivityIndicator color={Colors.textOnDark} />
             : <Text style={s.submitText}>Create Account  →</Text>}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.back()} style={s.loginRow} hitSlop={8}>
+        <TouchableOpacity
+          onPress={() => {
+            try {
+              if (typeof router.back === 'function') router.back();
+              else router.replace('/(auth)');
+            } catch (_) {
+              router.replace('/(auth)');
+            }
+          }}
+          style={s.loginRow}
+          hitSlop={8}
+        >
           <Text style={s.loginBase}>
             Already have an account?{'  '}
             <Text style={s.loginLink}>Sign In</Text>
           </Text>
         </TouchableOpacity>
+
+        {showCreated && (
+          <Animated.View
+            style={[
+              s.createdBanner,
+              { opacity: createdAnim, transform: [{ translateY: createdAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] },
+            ]}
+          >
+            <TouchableOpacity onPress={() => router.replace('/(auth)/login')} style={s.createdInner} accessibilityLabel="Proceed to sign in">
+              <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
+              <Text style={s.createdText}>Account created — please sign in to continue</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -381,4 +442,18 @@ const s = StyleSheet.create({
   loginRow: { alignItems: 'center', minHeight: 44, justifyContent: 'center' },
   loginBase: { ...Typography.body, color: Colors.textSecondary, textAlign: 'center' },
   loginLink: { color: Colors.brand, fontWeight: '700', textDecorationLine: 'underline' },
+  createdBanner: {
+    width: '100%',
+    backgroundColor: Colors.bgCard,
+    borderRadius: Radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadow.sm,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  createdInner: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  createdText: { ...Typography.bodySm, color: Colors.success, marginLeft: 6 },
 });

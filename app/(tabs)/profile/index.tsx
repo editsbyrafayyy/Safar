@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, Switch, SafeAreaView, ImageBackground, Alert,
+  Image, Switch, SafeAreaView, ImageBackground, Modal,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -9,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../../../constants/Theme';
 import { MOCK_USER, MOCK_TRIPS } from '../../../constants/mockData';
 import BottomTabBar from '../../../components/layouts/BottomTabBar';
-import { clearAuthState } from '../../../stores/authStore';
+import { useAuthStore } from '../../../stores/authStore';
 import { useProfileStore } from '../../../stores/profileStore';
 
 const COVER_IMAGE = 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=1200&q=80';
@@ -27,22 +28,20 @@ const FOLLOWERS_AVATARS = ['3', '5', '8', '4', '22', '14'];
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { logout } = useAuthStore();
   const { name: profileName, bio: profileBio } = useProfileStore();
   const [is2FA, set2FA] = useState(MOCK_USER.is2FAEnabled);
   const [isFaceID, setFaceID] = useState(MOCK_USER.isFaceIDEnabled);
+  const [confirmVisible, setConfirmVisible] = useState(false);
 
-  const handleLogout = () => {
-    Alert.alert('Confirm Sign Out', 'You will be signed out and returned to login. Continue?', [
-      { text: 'Cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: () => {
-          clearAuthState();
-          router.replace('/(auth)/login');
-        },
-      },
-    ]);
+  const handleConfirmSignOut = async () => {
+    setConfirmVisible(false);
+    try {
+      await logout();
+    } catch (e) {
+      console.warn('Logout error:', e);
+    }
+    router.replace('/(auth)/login');
   };
 
   return (
@@ -281,12 +280,29 @@ export default function ProfileScreen() {
 
         {/* Logout */}
         <Animated.View entering={FadeInUp.delay(260).duration(280)} style={styles.logoutSection}>
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} accessibilityLabel="Sign out">
+          <TouchableOpacity style={styles.logoutBtn} onPress={() => setConfirmVisible(true)} accessibilityLabel="Sign out">
             <Ionicons name="log-out-outline" size={16} color={Colors.danger} />
             <Text style={styles.logoutText}>Log Out of Safar</Text>
           </TouchableOpacity>
           <Text style={styles.versionText}>Version 1.0.0 · Arches Edition</Text>
         </Animated.View>
+
+        <Modal visible={confirmVisible} transparent animationType="fade" onRequestClose={() => setConfirmVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Confirm Sign Out</Text>
+              <Text style={styles.modalMessage}>You will be signed out and returned to the login screen. Continue?</Text>
+              <View style={styles.modalActions}>
+                <Pressable style={[styles.modalBtn, styles.modalCancel]} onPress={() => setConfirmVisible(false)}>
+                  <Text style={[styles.modalBtnText, styles.modalCancelText]}>Cancel</Text>
+                </Pressable>
+                <Pressable style={[styles.modalBtn, styles.modalConfirm]} onPress={handleConfirmSignOut}>
+                  <Text style={[styles.modalBtnText, styles.modalConfirmText]}>Sign Out</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
       </ScrollView>
       <BottomTabBar />
@@ -462,4 +478,30 @@ const styles = StyleSheet.create({
   },
   logoutText: { ...Typography.h4, color: Colors.danger },
   versionText: { ...Typography.caption, color: Colors.textMuted },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: Colors.bgCard,
+    borderRadius: Radius.lg,
+    padding: 18,
+    ...Shadow.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalTitle: { ...Typography.h4, color: Colors.textPrimary, marginBottom: 6 },
+  modalMessage: { ...Typography.body, color: Colors.textSecondary, marginBottom: 14 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
+  modalBtn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: Radius.full },
+  modalCancel: { backgroundColor: Colors.bg, borderWidth: 1, borderColor: Colors.border },
+  modalConfirm: { backgroundColor: Colors.danger },
+  modalBtnText: { ...Typography.label },
+  modalCancelText: { color: Colors.textPrimary },
+  modalConfirmText: { color: Colors.textOnDark },
 });
