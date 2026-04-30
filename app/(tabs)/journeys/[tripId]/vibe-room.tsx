@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
 	Image,
 	KeyboardAvoidingView,
@@ -15,16 +15,28 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Colors, Typography, Spacing, Radius, Shadow } from "../../../../constants/Theme";
-import { MOCK_VIBE_MESSAGES, MockVibeMessage } from "../../../../constants/mockData";
+import { useTripStore } from "../../../../stores/tripStore";
 
 export default function VibeRoomScreen() {
 	const router = useRouter();
-	useLocalSearchParams<{ tripId: string }>();
-	const [messages, setMessages] = useState(MOCK_VIBE_MESSAGES);
+	const { tripId } = useLocalSearchParams<{ tripId: string }>();
+	const { tripDetails, loadTripById } = useTripStore();
+	const trip = tripId && tripDetails[tripId as string];
+	const [messages, setMessages] = useState(trip?.messages || []);
 	const [input, setInput] = useState("");
 	const [showError, setShowError] = useState(false);
 	const [briefExpanded, setBriefExpanded] = useState(false);
 	const scrollRef = useRef<ScrollView>(null);
+
+	useEffect(() => {
+		if (tripId) {
+			loadTripById(tripId as string);
+		}
+	}, [tripId]);
+
+	useEffect(() => {
+		setMessages(trip?.messages || []);
+	}, [trip?.messages]);
 
 	const sendMessage = () => {
 		if (!input.trim()) return;
@@ -63,7 +75,7 @@ export default function VibeRoomScreen() {
 					</TouchableOpacity>
 					<View style={styles.headerCenter}>
 						<Text style={styles.headerSuper}>VIBE ROOM</Text>
-						<Text style={styles.headerTitle}>4 Active Explorers</Text>
+						<Text style={styles.headerTitle}>{trip?.participants?.length || 0} Active Explorers</Text>
 					</View>
 					<TouchableOpacity
 						onPress={() => router.push('/flows/vibe-room-members' as never)}
@@ -71,15 +83,15 @@ export default function VibeRoomScreen() {
 						hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
 						accessibilityLabel="Open room members"
 					>
-						<Text style={styles.headerAvatarText}>S</Text>
+						<Text style={styles.headerAvatarText}>{trip?.trip?.title?.charAt(0).toUpperCase() || 'T'}</Text>
 					</TouchableOpacity>
 				</View>
 
 				<View style={styles.membersRow}>
-					{["3", "5", "8", "4"].map((img, i) => (
+					{trip?.participants?.slice(0, 4).map((participant, i) => (
 						<Image
-							key={i}
-							source={{ uri: `https://i.pravatar.cc/40?img=${img}` }}
+							key={participant.user_id}
+							source={{ uri: participant.user?.profile?.profile_photo_url || `https://i.pravatar.cc/40?img=${i}` }}
 							style={[styles.memberAvatar, { marginLeft: i > 0 ? -10 : 0 }]}
 						/>
 					))}

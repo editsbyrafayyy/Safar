@@ -8,16 +8,17 @@ import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../../../constants/Theme';
-import { MOCK_USER, MOCK_TRIPS } from '../../../constants/mockData';
 import BottomTabBar from '../../../components/layouts/BottomTabBar';
 import { useAuthStore } from '../../../stores/authStore';
 import { useProfileStore } from '../../../stores/profileStore';
+import { useTripStore } from '../../../stores/tripStore';
+import { useEffect } from 'react';
 
 const COVER_IMAGE = 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=1200&q=80';
-const AVATAR_URI = 'https://i.pravatar.cc/200?img=11';
+
 
 const ACHIEVEMENTS = [
-  { icon: 'earth-outline' as const, label: `${MOCK_USER.countries} Countries` },
+  { icon: 'earth-outline' as const, label: 'Countries' },
   { icon: 'map-outline' as const, label: 'Mountain Seeker' },
   { icon: 'ribbon-outline' as const, label: 'Heritage Collector' },
   { icon: 'star-outline' as const, label: 'Verified Guide' },
@@ -29,9 +30,23 @@ const FOLLOWERS_AVATARS = ['3', '5', '8', '4', '22', '14'];
 export default function ProfileScreen() {
   const router = useRouter();
   const { logout } = useAuthStore();
-  const { name: profileName, bio: profileBio } = useProfileStore();
-  const [is2FA, set2FA] = useState(MOCK_USER.is2FAEnabled);
-  const [isFaceID, setFaceID] = useState(MOCK_USER.isFaceIDEnabled);
+  const { profile, travelerProfile, loadCurrentProfile } = useProfileStore();
+  const { trips, loadTripsForCurrentUser } = useTripStore();
+  const profileName = profile?.name ?? '—';
+  const profileBio = profile?.bio ?? 'Tell the world about your travel style.';
+
+  useEffect(() => {
+    loadCurrentProfile();
+    loadTripsForCurrentUser();
+  }, []);
+
+  const countriesVal = travelerProfile?.countries_count ?? travelerProfile?.destinations_visited ?? 0;
+  const expeditionsVal = travelerProfile?.expeditions_count ?? 0;
+  const followersVal = profile?.followers_count ?? 0;
+  const formatCount = (value: number) => (value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value));
+  const followersDisplay = formatCount(followersVal);
+  const [is2FA, set2FA] = useState(false);
+  const [isFaceID, setFaceID] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
 
   const handleConfirmSignOut = async () => {
@@ -57,13 +72,17 @@ export default function ProfileScreen() {
               </TouchableOpacity>
               <View style={styles.heroContent}>
                 <View style={styles.avatarRing}>
-                  <Image source={{ uri: AVATAR_URI }} style={styles.avatar} />
+                  {profile?.profile_photo_url ? (
+                    <Image source={{ uri: profile.profile_photo_url }} style={styles.avatar} />
+                  ) : (
+                    <View style={[styles.avatar, styles.blankAvatar]} />
+                  )}
                   <TouchableOpacity style={styles.editBadge} onPress={() => router.push('/flows/profile-photo')} accessibilityLabel="Update profile photo">
                     <Ionicons name="camera" size={11} color={Colors.textOnDark} />
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.heroName}>{profileName}</Text>
-                <Text style={styles.heroTitle}>{MOCK_USER.title}</Text>
+                <Text style={styles.heroTitle}>{travelerProfile?.travel_style ?? 'Traveler'}</Text>
                 <Text style={styles.heroQuote}>{profileBio}</Text>
               </View>
             </View>
@@ -93,9 +112,9 @@ export default function ProfileScreen() {
         {/* Stats */}
         <Animated.View entering={FadeInUp.delay(90).duration(280)} style={styles.statsCard}>
           {[
-            { icon: 'earth-outline' as const, val: String(MOCK_USER.countries), label: 'Countries' },
-            { icon: 'compass-outline' as const, val: String(MOCK_USER.trips), label: 'Expeditions' },
-            { icon: 'people-outline' as const, val: `${(MOCK_USER.followers / 1000).toFixed(1)}k`, label: 'Followers' },
+            { icon: 'earth-outline' as const, val: String(countriesVal), label: 'Countries' },
+            { icon: 'compass-outline' as const, val: String(expeditionsVal), label: 'Expeditions' },
+            { icon: 'people-outline' as const, val: followersDisplay, label: 'Followers' },
           ].map((s, i) => (
             <React.Fragment key={s.label}>
               {i > 0 && <View style={styles.statDivider} />}
@@ -134,7 +153,7 @@ export default function ProfileScreen() {
               ))}
             </View>
             <Text style={styles.followersText}>
-              <Text style={styles.followersStrong}>Areeba, Zain</Text> and {(MOCK_USER.followers / 1000).toFixed(1)}k others follow you
+              <Text style={styles.followersStrong}>Areeba, Zain</Text> and {followersDisplay} others follow you
             </Text>
           </View>
           <TouchableOpacity onPress={() => router.push('/flows/followers')}>
@@ -151,19 +170,19 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tripsRow}>
-            {MOCK_TRIPS.map((trip) => (
+            {trips.slice(0, 4).map((trip) => (
               <TouchableOpacity
                 key={trip.id}
                 style={styles.tripCard}
                 activeOpacity={0.88}
                 onPress={() => router.push(`/(tabs)/journeys/${trip.id}/itinerary`)}
               >
-                <Image source={{ uri: trip.heroImage }} style={styles.tripCardImg} />
+                <Image source={{ uri: trip.hero_image_url || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1000&q=80' }} style={styles.tripCardImg} />
                 <View style={styles.tripCardBody}>
                   <Text style={styles.tripCardTitle} numberOfLines={1}>{trip.title}</Text>
-                  <Text style={styles.tripCardDest}>{trip.destination}</Text>
-                  <Text style={styles.tripCardDate}>{trip.dates}</Text>
-                  {trip.daysLeft > 0 && (
+                  <Text style={styles.tripCardDest}>{trip.destination || 'TBD'}</Text>
+                  <Text style={styles.tripCardDate}>{trip.start_date && trip.end_date ? `${trip.start_date} - ${trip.end_date}` : 'TBD'}</Text>
+                  {trip.status !== 'Completed' && (
                     <View style={styles.tripActivePill}>
                       <Text style={styles.tripActivePillText}>Active</Text>
                     </View>
@@ -339,6 +358,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatar: { width: 90, height: 90, borderRadius: 45 },
+  blankAvatar: { backgroundColor: '#fff', borderWidth: 1, borderColor: Colors.border },
   editBadge: {
     position: 'absolute', bottom: 0, right: -2,
     width: 26, height: 26, borderRadius: 13,

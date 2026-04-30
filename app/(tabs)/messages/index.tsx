@@ -11,6 +11,9 @@ import {
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import BottomTabBar from "@/components/layouts/BottomTabBar";
+import { useEffect } from 'react';
+import { useAuthStore } from '@/stores/authStore';
+import useChatStore from '@/stores/chatStore';
 import { Colors, Spacing, Radius, Typography } from "@/constants/Theme";
 
 type Room = {
@@ -53,6 +56,27 @@ export default function MessagesScreen() {
   const [rooms, setRooms] = useState(CHAT_ROOMS);
   const [activeRoom, setActiveRoom] = useState(CHAT_ROOMS[0].id);
   const [roomMessages, setRoomMessages] = useState(INITIAL_MESSAGES);
+
+  const auth = useAuthStore();
+  const chat = useChatStore();
+  const storeRooms = useChatStore((s) => s.rooms);
+
+  useEffect(() => {
+    // load matches for the signed-in user and present them as chat rooms
+    (async () => {
+      if (auth.user) {
+        await chat.loadMatchesForUser(auth.user.id);
+        // rooms will also be updated via the storeRooms subscription below
+      }
+    })();
+  }, [auth.user]);
+
+  useEffect(() => {
+    if (!storeRooms || storeRooms.length === 0) return;
+    const mapped = storeRooms.map((r) => ({ id: r.id, name: r.other_name ?? 'Traveler', subtitle: r.status ?? '', unread: 0 }));
+    setRooms(mapped);
+    setActiveRoom((prev) => mapped.find((m) => m.id === prev)?.id ?? mapped[0].id);
+  }, [storeRooms.length]);
   const [draft, setDraft] = useState("");
   const [roomQuery, setRoomQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);

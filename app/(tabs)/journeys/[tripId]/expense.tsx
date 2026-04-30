@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
 	Alert,
 	ActivityIndicator,
@@ -12,11 +12,11 @@ import {
 	View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Colors, Typography, Spacing, Radius, Shadow } from "../../../../constants/Theme";
-import { MOCK_EXPENSES } from "../../../../constants/mockData";
 import BottomTabBar from "../../../../components/layouts/BottomTabBar";
 import OfflineBanner from "../../../../components/ui/OfflineBanner";
+import { useTripStore } from "../../../../stores/tripStore";
 
 const CATEGORY_ICON: Record<string, React.ComponentProps<typeof Ionicons>["name"]> = {
 	Dining: "restaurant-outline",
@@ -25,18 +25,23 @@ const CATEGORY_ICON: Record<string, React.ComponentProps<typeof Ionicons>["name"
 	Activity: "bicycle-outline",
 };
 
-const MEMBERS = ["You", "Areeba", "Zain", "Maha"];
 const SPLIT_TYPES = ["Split equally", "By percentage", "Exact amount"] as const;
 type SplitType = typeof SPLIT_TYPES[number];
 
-const MOCK_BALANCES = [
-	{ name: "Maha", owes: "You", amount: 4200 },
-	{ name: "Areeba", owes: "You", amount: 2800 },
-	{ name: "You", owes: "Zain", amount: 1400 },
-];
-
 export default function ExpenseScreen() {
 	const router = useRouter();
+	const { tripId } = useLocalSearchParams<{ tripId: string }>();
+	const { tripDetails, loadTripById } = useTripStore();
+	const trip = tripId && tripDetails[tripId as string];
+	const expenses = trip?.expenses || [];
+	const ledger = trip?.ledger;
+
+	useEffect(() => {
+		if (tripId) {
+			loadTripById(tripId as string);
+		}
+	}, [tripId]);
+
 	const [settled, setSettled] = useState(false);
 	const [showAddModal, setShowAddModal] = useState(false);
 	const [newName, setNewName] = useState("");
@@ -121,39 +126,37 @@ export default function ExpenseScreen() {
 						<Ionicons name="card-outline" size={22} color={Colors.textSecondary} />
 					</View>
 					<Text style={styles.totalLabel}>TOTAL GROUP SPEND</Text>
-					<Text style={styles.totalAmount}>PKR {MOCK_EXPENSES.totalGroupSpend.toLocaleString()}</Text>
+					<Text style={styles.totalAmount}>PKR {expenses.reduce((sum, e) => sum + (e.amount || 0), 0).toLocaleString()}</Text>
 				</View>
 
 				<View style={styles.balanceCard}>
 					<Ionicons name="wallet-outline" size={22} color={Colors.textSecondary} style={{ marginBottom: 6 }} />
 					<Text style={styles.balanceLabel}>YOUR BALANCE</Text>
-					<Text style={[styles.balanceAmount, { color: Colors.success }]}>+PKR {MOCK_EXPENSES.yourBalance.toLocaleString()}</Text>
-					<Text style={styles.pendingText}>{MOCK_EXPENSES.pendingSettlements} Pending settlements</Text>
+					<Text style={[styles.balanceAmount, { color: ledger?.your_balance ?? 0 > 0 ? Colors.success : Colors.textSecondary }]}>PKR {Math.abs(ledger?.your_balance || 0).toLocaleString()}</Text>
+					<Text style={styles.pendingText}>{expenses.length} expenses</Text>
 				</View>
 
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Who Owes Whom</Text>
-					{MOCK_BALANCES.map((b, i) => (
-						<View key={i} style={styles.balanceRow}>
+				{ledger && (
+					<View style={styles.section}>
+						<Text style={styles.sectionTitle}>Settlement Status</Text>
+						<View style={styles.balanceRow}>
 							<View style={styles.balanceLeft}>
-								<Text style={styles.balanceName}>{b.name}</Text>
-								<Text style={styles.balanceArrow}> owes </Text>
-								<Text style={styles.balanceName}>{b.owes}</Text>
+								<Text style={styles.balanceName}>Group Balance</Text>
 							</View>
-							<Text style={styles.balanceAmt}>PKR {b.amount.toLocaleString()}</Text>
+							<Text style={styles.balanceAmt}>PKR {Math.abs(ledger.total_amount || 0).toLocaleString()}</Text>
 						</View>
-					))}
-					<TouchableOpacity
-						style={[styles.settleBtn, settled && styles.settleBtnDone]}
-						onPress={handleSettle}
-						disabled={isProcessing}
-						accessibilityLabel="Settle up group expenses"
-					>
-						{isProcessing
-							? <ActivityIndicator color={Colors.textOnDark} />
-							: <Text style={styles.settleBtnText}>{settled ? "✓ Settled" : "Settle Up"}</Text>}
-					</TouchableOpacity>
-				</View>
+						<TouchableOpacity
+							style={[styles.settleBtn, settled && styles.settleBtnDone]}
+							onPress={handleSettle}
+							disabled={isProcessing}
+							accessibilityLabel="Settle up group expenses"
+						>
+							{isProcessing
+								? <ActivityIndicator color={Colors.textOnDark} />
+								: <Text style={styles.settleBtnText}>{settled ? "✓ Settled" : "Settle Up"}</Text>}
+						</TouchableOpacity>
+					</View>
+				)}
 
 				{!!actionMsg && <Text style={styles.actionMessage}>{actionMsg}</Text>}
 
@@ -165,7 +168,7 @@ export default function ExpenseScreen() {
 						</TouchableOpacity>
 					</View>
 
-					{MOCK_EXPENSES.items.map((item) => (
+					{expenses.map((item) => (
 						<View key={item.id} style={styles.expenseRow}>
 							<View style={styles.expenseIconWrap}>
 								<Ionicons
@@ -175,12 +178,12 @@ export default function ExpenseScreen() {
 								/>
 							</View>
 							<View style={styles.expenseInfo}>
-								<Text style={styles.expenseName}>{item.name}</Text>
-								<Text style={styles.expenseMeta}>Paid by {item.paidBy} • {item.category}</Text>
+								<Text style={styles.expenseName}>{item.description}</Text>
+								<Text style={styles.expenseMeta}>Added on {new Date(item.created_at).toLocaleDateString()}</Text>
 							</View>
 							<View style={styles.expenseRight}>
 								<Text style={styles.expenseAmount}>PKR {item.amount.toLocaleString()}</Text>
-								<Text style={styles.expenseSplit}>{item.split}</Text>
+								<Text style={styles.expenseSplit}>{item.split_with?.length || 1} people</Text>
 							</View>
 						</View>
 					))}

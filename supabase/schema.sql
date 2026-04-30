@@ -23,6 +23,7 @@ create table traveler_profiles (
   persona_dna jsonb, -- e.g., { heritage: 0.8, culinary: 0.5 }
   curation_score float default 0,
   expeditions_count int default 0,
+  countries_count int default 0,
   heritage_points int default 0
 );
 
@@ -186,4 +187,12 @@ create table safety_contacts (
   contact_name text not null,
   contact_phone text not null,
   primary key (user_id, contact_phone)
+);
+
+-- FOLLOWERS (simple follower relationship)
+create table followers (
+  user_id uuid references profiles(id) on delete cascade,
+  follower_id uuid references profiles(id) on delete cascade,
+  followed_at timestamptz default now(),
+  primary key (user_id, follower_id)
 );
