@@ -1,142 +1,76 @@
-```markdown
-# SAFAR — Implementation & Progress Consolidation
+# SAFAR Implementation Status (AI Handoff)
 
-This document consolidates the project's build progress, implementation checklist, project index, and engineering notes so implementation history and next steps are easy to find.
+Last updated: 2026-04-30
 
----
+## Objective
 
-## Build Progress Log (merged)
+Move the app from mock-driven UI to Supabase-backed user-specific data while keeping screens stable and build-safe.
 
-``` (from Build_Progress.md)
+## Completed Work
 
-# SAFAR Build Progress Log
+### 1) Stores
 
-This file is updated after every meaningful change set.
+- profileStore implemented/extended
+  - Loads profiles row for current user
+  - Loads traveler_profiles row for current user
+  - Computes follower count from followers table
+- chatStore implemented
+  - Loads match relationships and chat room list data
+- tripStore expanded
+  - Loads trips (owned + participant)
+  - Loads trip participants
+  - Loads itinerary + ordered stops
+  - Loads vibe room + messages
+  - Loads expense ledger + expenses
+  - Includes wishlist state/actions used by Explore/Journeys
 
-Any AI agent that changes code must update all Markdown files in the repo to keep documentation current.
+### 2) Screens migrated to live data
 
-## Update Protocol
+- app/(tabs)/profile/index.tsx
+- app/(tabs)/messages/index.tsx
+- app/(tabs)/community/index.tsx
+- app/(tabs)/journeys/index.tsx
+- app/(tabs)/journeys/[tripId]/itinerary.tsx
+- app/(tabs)/journeys/[tripId]/vibe-room.tsx
+- app/(tabs)/journeys/[tripId]/expense.tsx
 
-For each update entry, include:
+### 3) Stability fixes already handled
 
-1. Date/time
-2. Goal of the change
-3. Files changed
-4. What was verified
-5. Known issues or follow-ups
-6. Reasoning (why this approach was chosen)
-7. Core idea (the design/engineering principle behind the change)
+- Removed stale mock references that triggered runtime crashes in Profile
+- Fixed duplicate hook declarations in vibe-room screen
+- Fixed invalid JSX token in vibe-room members block
+- Corrected follower count presentation for small numbers (no forced 0.0k)
 
-## Documentation Standard (Mandatory)
+## Open Work (Execution Order)
 
-Every future update must explain in simple words:
-- what changed,
-- why it changed,
-- how it was verified,
-- and the core idea behind the implementation choice.
+1. Explore migration
+   - Replace MOCK_EXPLORE and MOCK_DESTINATIONS consumers
+2. Traveler details migration
+   - Replace MOCK_TRAVELER with profileStore/loadProfileById flow
+3. Agencies migration
+   - Replace MOCK_AGENCIES, MOCK_AGENCY_DETAIL, MOCK_COST_COMPARISON
+4. Safety migration decision
+   - Either keep static emergency references intentionally, or wire to backend tables
+5. Cleanup and hardening
+   - Remove dead mock imports
+   - Add empty/loading/error states where still missing
+   - Optional realtime for messages and trip updates
 
-Current primary testing workflow: Web variant via `npx expo start --web --clear`.
+## Known Contracts Used by Current UI
 
----
+- Profile stats
+  - countries: traveler_profiles.countries_count (fallback destinations_visited)
+  - expeditions: traveler_profiles.expeditions_count
+  - followers: count from followers table filtered by user_id
+- Journey cards
+  - trips.hero_image_url
+  - trips.destination
+  - trips.start_date/end_date
+  - trips.status
 
-## (Full chronological entries preserved from original Build_Progress.md)
+## Handoff Notes for Next AI
 
-*(Entries 001–024 kept in full in the original file — preserved here for history and traceability.)*
-
----
-
-## Implementation Checklist (merged)
-
-``` (from Implementation_Checklist.md)
-
-# SAFAR Implementation Checklist (Step-by-Step)
-
-## Working Mode
-
-Any AI agent that changes code must update all Markdown files in the repo to keep documentation current.
-
-All markdown updates must include reasoning, verification, and core idea—not only a list of edits.
-
-Primary active testing mode: web variant with `npx expo start --web --clear`.
-
-Latest completed UI milestone: Entry 018 in `Build_Progress.md`.
-
-- Build in small, testable slices.
-- Never move to the next slice until the current slice runs without runtime/type errors.
-- After every change set, update `Build_Progress.md` with:
-  - What changed
-  - Why this approach was chosen
-  - Files touched
-  - Verification done
-  - Core idea behind the change
-  - Open issues/blockers
-
-## Phase 0 — Project Foundation (Start Here)
-
-- [ ] Initialize/verify Expo app config and scripts
-- [ ] Add TypeScript, Expo Router, Zustand, Supabase, AsyncStorage, NetInfo, Maps deps
-- [ ] Add environment variable template (`.env.example`)
-- [ ] Configure app shell layout and route groups
-- [ ] Set up design tokens in `constants/colors.ts`
-- [ ] Add global reusable layout/header scaffolding
-- [ ] Add strict lint/typecheck scripts
-- [ ] Smoke test app boot on simulator + Expo Go
-
-## Phase 1 — Data & Core Logic
-
-- [x] Implement `supabase/schema.sql` from PRD entities
-- [ ] Implement `supabase/seed.sql` with demo-safe seed data
-- [x] Implement `lib/supabase.ts` client with env validation
-- [ ] Implement `lib/matchEngine.ts` using weighted scoring spec
-- [ ] Implement `lib/expenseCalc.ts` with split/balance settlement logic
-- [ ] Implement `lib/offlineStore.ts` cache wrappers with safe fallbacks
-- [ ] Unit test pure logic modules (`matchEngine`, `expenseCalc`)
-
-... (rest of Implementation_Checklist preserved)
-
----
-
-## Project Index Snapshot
-
-*(Full PROJECT_INDEX.md content preserved in `docs/PROJECT_INDEX.md` — see the consolidated index file.)*
-
----
-
-## Team Notes (from changes_by_ammar.md)
-
-``` (from changes_by_ammar.md)
-
-# Changes by Ammar
-
-This document tracks the recent backend initialization and bug-fix changes made to the SAFAR project during this session.
-
-### 1. Database Schema Generation
-- Extracted the full PostgreSQL database schema (17 tables) from the `Safar_Context.md` PRD.
-- Pre-populated `supabase/schema.sql` with this complete schema, making it ready for a one-click run in the Supabase SQL Editor.
-- The schema includes complete structures for Users, Traveler Profiles, Matches, Trips, Vibe Rooms (Chat & Polls), Expense Ledgers, Agencies, and Safety.
-- Created a comprehensive `supabase_database_documentation.md` artifact detailing each table's purpose and contents.
-
-### 2. Client & Environment Configuration
-- Guided the setup of the `.env` file to securely store `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
-- Updated `lib/supabase.ts` to properly initialize the Supabase client using these environment variables along with proper TypeScript typings.
-
-### 3. Dependency & Bug Fixes
-- Diagnosed a corrupted `node_modules` installation (`mimeScore` missing module error) and provided exact steps to perform a clean cache wipe and reinstall.
-- Identified that the crucial `react-native-url-polyfill` package was completely missing from `package.json`.
-- Installed `react-native-url-polyfill` via the terminal to ensure Supabase's network requests execute successfully within the React Native environment.
-
-### 4. Connection Verification
-- Wrote a live Supabase connection test inside `lib/supabase.ts` to ping the `users` table and return a success/error log.
-- Wired `lib/supabase.ts` into the root `app/_layout.tsx` so the Expo bundler compiles it and the test executes immediately on app boot.
-- Verified that the Expo web bundler outputs `✅ Supabase is connected successfully!` in the browser console.
-
-### 5. Documentation Updates
-- Updated `Implementation_Checklist.md` to officially mark Phase 1 tasks (`supabase/schema.sql` and `lib/supabase.ts` implementation) as **DONE [x]**.
-
-```
-
----
-
-*(Implementation consolidation complete — originals will be removed from the repository root.)*
-
-```
+- Do not reintroduce mock fallback as default source for migrated screens.
+- Keep fields nullable-safe in UI to avoid runtime crashes.
+- Validate each migrated screen with a real signed-in user after edits.
+- If adding new DB fields, reflect changes in docs/Database.md and supabase/schema.sql together.
