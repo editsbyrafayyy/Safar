@@ -115,16 +115,42 @@ export default function ExploreScreen() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const { featuredTrip, exploreJourneys, loadExploreContent, addToWishlist, removeFromWishlist, isWishlisted } = useTripStore();
+  const { featuredTrips, exploreJourneys, loadExploreContent, addToWishlist, removeFromWishlist, isWishlisted } = useTripStore();
   const { nearbyTravelers, loadNearbyTravelers } = useProfileStore();
-  const { featured, categories, journeys, vicinityTravelers } = MOCK_EXPLORE;
+  const { categories, journeys, vicinityTravelers } = MOCK_EXPLORE;
 
-  const featuredWishlistId = featuredTrip?.id ?? featured.title.toLowerCase().replace(/\s+/g, '-');
-  const featuredSaved = isWishlisted(featuredWishlistId);
-
-  const featuredFallbackUri = featured.fallbackImage ?? featured.image;
-  const featuredImageSource = featuredTrip?.hero_image_url ?? featured.image;
-  const featuredHighlights = featuredTrip?.destination ? [featuredTrip.destination] : featured.highlights?.slice(0, 3) ?? [];
+  const featuredItems = featuredTrips.length > 0 ? featuredTrips : [
+    {
+      id: "mock-1",
+      title: "Hunza Valley",
+      description: "Golden autumn corridors, glacier-fed lakes, and slow heritage trails.",
+      destination: "NORTHERN PAKISTAN",
+      status: "TRENDING",
+      hero_image_url: "https://images.unsplash.com/photo-1548013146-72479768bada?auto=format&fit=crop&w=1200&q=80",
+      duration: "7 DAYS",
+      highlights: ["Glacier-fed lakes", "Heritage trails", "Autumn glow"],
+    },
+    {
+      id: "mock-2",
+      title: "Swat Valley",
+      description: "Alpine meadows, winding rivers, and deep pine forests.",
+      destination: "KHYBER PAKHTUNKHWA",
+      status: "POPULAR",
+      hero_image_url: "https://images.unsplash.com/photo-1504900954325-23c46b4ce8df?auto=format&fit=crop&w=1200&q=80",
+      duration: "5 DAYS",
+      highlights: ["Mahodand Lake", "Kalam Valley", "Ushu Forest"],
+    },
+    {
+      id: "mock-3",
+      title: "Fairy Meadows",
+      description: "At the foot of the killer mountain, a serene alpine pasture.",
+      destination: "GILGIT-BALTISTAN",
+      status: "ADVENTURE",
+      hero_image_url: "https://images.unsplash.com/photo-1467173572719-f14b9fb86e5f?auto=format&fit=crop&w=1200&q=80",
+      duration: "4 DAYS",
+      highlights: ["Nanga Parbat", "Raikot Bridge", "Pine Forests"],
+    }
+  ];
 
   const baseJourneys = exploreJourneys.length > 0 ? exploreJourneys : CATEGORY_DATA[activeCategory]?.journeys ?? journeys;
   const sectionHeadline = CATEGORY_DATA[activeCategory]?.headline ?? 'Curated Journeys';
@@ -198,75 +224,93 @@ export default function ExploreScreen() {
         </ScrollView>
 
         <Text style={styles.sectionLabel}>FEATURED ESCAPE</Text>
-        <Animated.View entering={FadeInUp.delay(80).duration(280)}>
-        <TouchableOpacity
-          style={styles.featuredCard}
-          activeOpacity={0.9}
-          onPress={() => router.push('/(tabs)/explore/hunza-valley' as never)}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: Spacing.screen, gap: 12, paddingBottom: 8 }}
+          snapToInterval={312} // 300 width + 12 gap
+          decelerationRate="fast"
         >
-          <ImageBackground
-            source={{ uri: featuredImageSource }}
-            style={styles.featuredImg}
-            imageStyle={styles.featuredImgStyle}
-            resizeMode="cover"
-            onError={() => {
-              // fallback handled by featuredTrip check
-            }}
-          >
-            <View style={styles.featuredOverlay}>
-              <View style={styles.featuredTopRow}>
-                <View style={styles.trendingBadge}>
-                  <Text style={styles.trendingText}>{featuredTrip ? 'FEATURED' : featured.badge}</Text>
-                  <Text style={styles.trendingRegion}>  {featuredTrip?.destination ?? featured.region}</Text>
-                </View>
-                {featuredTrip?.status || featured.duration ? (
-                  <View style={styles.featuredMeta}>
-                    <Text style={styles.featuredMetaText}>{featuredTrip?.status || featured.duration}</Text>
-                  </View>
-                ) : null}
-              </View>
-              {featuredHighlights.length > 0 ? (
-                <View style={styles.featuredHighlights}>
-                  {featuredHighlights.map((item) => (
-                    <View key={item} style={styles.featuredChip}>
-                      <Text style={styles.featuredChipText}>{item}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-              <Text style={styles.featuredTitle}>{featuredTrip?.title ?? featured.title}</Text>
-              <Text style={styles.featuredDesc}>{featuredTrip?.destination ? `Experience the magic of ${featuredTrip.destination}` : featured.description}</Text>
-              <View style={styles.featuredActions}>
+          {featuredItems.map((item, index) => {
+            const isSaved = isWishlisted(item.id);
+            const imageUri = item.hero_image_url || 'https://images.unsplash.com/photo-1548013146-72479768bada?auto=format&fit=crop&w=1200&q=80';
+            const itemHighlights = item.destination ? [item.destination] : (item as any).highlights?.slice(0, 3) ?? [];
+            
+            return (
+              <Animated.View key={item.id} entering={FadeInUp.delay(80 + index * 100).duration(280)}>
                 <TouchableOpacity
-                  style={styles.wishlistBtn}
-                  onPress={() => {
-                    if (featuredSaved) {
-                      removeFromWishlist(featuredWishlistId);
-                      return;
-                    }
-                    addToWishlist({
-                      title: featuredTrip?.title ?? featured.title,
-                      subtitle: featuredTrip?.destination ?? featured.region,
-                      image: featuredTrip?.hero_image_url ?? featured.image,
-                      note: `Status: ${featuredTrip?.status ?? 'Preparing'}`,
-                    });
-                  }}
-                  accessibilityLabel={featuredSaved ? 'Remove from wishlist' : 'Save to wishlist'}
+                  style={[styles.featuredCard, { marginHorizontal: 0, width: 300 }]}
+                  activeOpacity={0.9}
+                  onPress={() => router.push('/(tabs)/explore/hunza-valley' as never)}
                 >
-                  <Ionicons
-                    name={featuredSaved ? 'heart' : 'heart-outline'}
-                    size={20}
-                    color={featuredSaved ? Colors.danger : Colors.textMuted}
-                  />
+                  <ImageBackground
+                    source={{ uri: imageUri }}
+                    style={styles.featuredImg}
+                    imageStyle={styles.featuredImgStyle}
+                    resizeMode="cover"
+                  >
+                    <View style={styles.featuredOverlay}>
+                      <View style={styles.featuredTopRow}>
+                        <View style={styles.trendingBadge}>
+                          <Text style={styles.trendingText}>{item.status || 'FEATURED'}</Text>
+                          <Text style={styles.trendingRegion}>  {item.destination || 'PAKISTAN'}</Text>
+                        </View>
+                        {(item as any).duration && (
+                          <View style={styles.featuredMeta}>
+                            <Text style={styles.featuredMetaText}>{(item as any).duration}</Text>
+                          </View>
+                        )}
+                      </View>
+                      
+                      {itemHighlights.length > 0 && (
+                        <View style={styles.featuredHighlights}>
+                          {itemHighlights.map((hl: string) => (
+                            <View key={hl} style={styles.featuredChip}>
+                              <Text style={styles.featuredChipText}>{hl}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                      
+                      <Text style={styles.featuredTitle}>{item.title}</Text>
+                      <Text style={styles.featuredDesc} numberOfLines={2}>
+                        {(item as any).description || `Experience the magic of ${item.destination || item.title}`}
+                      </Text>
+                      
+                      <View style={styles.featuredActions}>
+                        <TouchableOpacity
+                          style={styles.wishlistBtn}
+                          onPress={() => {
+                            if (isSaved) {
+                              removeFromWishlist(item.id);
+                            } else {
+                              addToWishlist({
+                                id: item.id,
+                                title: item.title,
+                                subtitle: item.destination || 'PAKISTAN',
+                                image: imageUri,
+                                note: `Status: ${item.status || 'Upcoming'}`,
+                              });
+                            }
+                          }}
+                        >
+                          <Ionicons
+                            name={isSaved ? 'heart' : 'heart-outline'}
+                            size={20}
+                            color={isSaved ? Colors.danger : Colors.textMuted}
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.joinBtn} onPress={() => router.push('/(tabs)/journeys/new-journey')}>
+                          <Text style={styles.joinText}>Join Expedition</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </ImageBackground>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.joinBtn} onPress={() => router.push('/(tabs)/journeys/new-journey')}>
-                  <Text style={styles.joinText}>Join Expedition</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </ImageBackground>
-        </TouchableOpacity>
-        </Animated.View>
+              </Animated.View>
+            );
+          })}
+        </ScrollView>
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{sectionHeadline}</Text>
@@ -305,17 +349,17 @@ export default function ExploreScreen() {
         <TouchableOpacity
           style={styles.journeyCard}
           activeOpacity={0.88}
-          onPress={() => router.push(`/(tabs)/journeys/${filteredJourneys[0].id}/itinerary` as never)}
+          onPress={() => router.push(`/(tabs)/journeys/${(filteredJourneys[0] as any).id || '1'}/itinerary` as never)}
         >
-          <Image source={{ uri: filteredJourneys[0].hero_image_url || filteredJourneys[0].image }} style={styles.journeyImg} />
+          <Image source={{ uri: (filteredJourneys[0] as any).hero_image_url || (filteredJourneys[0] as any).image }} style={styles.journeyImg} />
           <View style={styles.journeyBody}>
             <View style={styles.journeyTitleRow}>
-              <Text style={styles.journeyTitle}>{filteredJourneys[0].title}</Text>
+              <Text style={styles.journeyTitle}>{(filteredJourneys[0] as any).title}</Text>
               <View style={styles.matchCountBadge}>
                 <Text style={styles.matchCountText}>+{(filteredJourneys[0] as any).matchCount || 0}</Text>
               </View>
             </View>
-            <Text style={styles.journeyDesc}>{filteredJourneys[0].description || `Explore ${filteredJourneys[0].destination}`}</Text>
+            <Text style={styles.journeyDesc}>{(filteredJourneys[0] as any).description || `Explore ${(filteredJourneys[0] as any).destination}`}</Text>
             <View style={styles.journeyActions}>
               <TouchableOpacity
                 style={styles.journeyActionBtn}
@@ -357,14 +401,14 @@ export default function ExploreScreen() {
           onPress={() => router.push('/(tabs)/explore/desert-caravan-nights' as never)}
         >
           <ImageBackground
-            source={{ uri: filteredJourneys[1].hero_image_url || filteredJourneys[1].image }}
+            source={{ uri: (filteredJourneys[1] as any).hero_image_url || (filteredJourneys[1] as any).image }}
             style={styles.fullImgBg}
             imageStyle={{ borderRadius: Radius.lg }}
           >
             <View style={styles.fullImgOverlay}>
-              <Text style={styles.fullImgTitle}>{filteredJourneys[1].title}</Text>
-              {filteredJourneys[1].destination && (
-                <Text style={styles.fullImgSub}>{filteredJourneys[1].destination}</Text>
+              <Text style={styles.fullImgTitle}>{(filteredJourneys[1] as any).title}</Text>
+              {(filteredJourneys[1] as any).destination && (
+                <Text style={styles.fullImgSub}>{(filteredJourneys[1] as any).destination}</Text>
               )}
             </View>
           </ImageBackground>

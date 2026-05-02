@@ -32,7 +32,7 @@ export default function ExpenseScreen() {
 	const router = useRouter();
 	const { tripId } = useLocalSearchParams<{ tripId: string }>();
 	const { tripDetails, loadTripById } = useTripStore();
-	const trip = tripId && tripDetails[tripId as string];
+	const trip = typeof tripId === 'string' ? tripDetails[tripId] : undefined;
 	const expenses = trip?.expenses || [];
 	const ledger = trip?.ledger;
 
@@ -107,7 +107,7 @@ export default function ExpenseScreen() {
 					<Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
 				</TouchableOpacity>
 				<View style={styles.headerTitle}>
-					<Text style={styles.headerSuper}>{MOCK_EXPENSES.tripTitle.toUpperCase()}</Text>
+					<Text style={styles.headerSuper}>{trip?.trip?.title?.toUpperCase() || 'TRIP'}</Text>
 					<Text style={styles.headerMain}>Expense Ledger</Text>
 				</View>
 				<TouchableOpacity
@@ -126,13 +126,13 @@ export default function ExpenseScreen() {
 						<Ionicons name="card-outline" size={22} color={Colors.textSecondary} />
 					</View>
 					<Text style={styles.totalLabel}>TOTAL GROUP SPEND</Text>
-					<Text style={styles.totalAmount}>PKR {expenses.reduce((sum, e) => sum + (e.amount || 0), 0).toLocaleString()}</Text>
+					<Text style={styles.totalAmount}>PKR {expenses.reduce((sum, e) => sum + (e.amount_pkr || 0), 0).toLocaleString()}</Text>
 				</View>
 
 				<View style={styles.balanceCard}>
 					<Ionicons name="wallet-outline" size={22} color={Colors.textSecondary} style={{ marginBottom: 6 }} />
 					<Text style={styles.balanceLabel}>YOUR BALANCE</Text>
-					<Text style={[styles.balanceAmount, { color: ledger?.your_balance ?? 0 > 0 ? Colors.success : Colors.textSecondary }]}>PKR {Math.abs(ledger?.your_balance || 0).toLocaleString()}</Text>
+					<Text style={[styles.balanceAmount, { color: ledger?.user_balances?.[trip?.participants?.[0]?.user_id] ?? 0 > 0 ? Colors.success : Colors.textSecondary }]}>PKR {Math.abs(ledger?.user_balances?.[trip?.participants?.[0]?.user_id] || 0).toLocaleString()}</Text>
 					<Text style={styles.pendingText}>{expenses.length} expenses</Text>
 				</View>
 
@@ -143,7 +143,7 @@ export default function ExpenseScreen() {
 							<View style={styles.balanceLeft}>
 								<Text style={styles.balanceName}>Group Balance</Text>
 							</View>
-							<Text style={styles.balanceAmt}>PKR {Math.abs(ledger.total_amount || 0).toLocaleString()}</Text>
+							<Text style={styles.balanceAmt}>PKR {Math.abs(ledger.total_group_spend || 0).toLocaleString()}</Text>
 						</View>
 						<TouchableOpacity
 							style={[styles.settleBtn, settled && styles.settleBtnDone]}
@@ -172,18 +172,18 @@ export default function ExpenseScreen() {
 						<View key={item.id} style={styles.expenseRow}>
 							<View style={styles.expenseIconWrap}>
 								<Ionicons
-									name={CATEGORY_ICON[item.category] ?? "receipt-outline"}
+									name={CATEGORY_ICON[item.category || "Other"] ?? "receipt-outline"}
 									size={20}
 									color={Colors.brand}
 								/>
 							</View>
 							<View style={styles.expenseInfo}>
-								<Text style={styles.expenseName}>{item.description}</Text>
-								<Text style={styles.expenseMeta}>Added on {new Date(item.created_at).toLocaleDateString()}</Text>
+								<Text style={styles.expenseName}>{item.category || "Other Expense"}</Text>
+								<Text style={styles.expenseMeta}>Added on {item.expense_date || "Unknown"}</Text>
 							</View>
 							<View style={styles.expenseRight}>
-								<Text style={styles.expenseAmount}>PKR {item.amount.toLocaleString()}</Text>
-								<Text style={styles.expenseSplit}>{item.split_with?.length || 1} people</Text>
+								<Text style={styles.expenseAmount}>PKR {(item.amount_pkr || 0).toLocaleString()}</Text>
+								<Text style={styles.expenseSplit}>{item.split_method || "Equal"} people</Text>
 							</View>
 						</View>
 					))}
@@ -227,7 +227,7 @@ export default function ExpenseScreen() {
 
 						<Text style={styles.addFieldLabel}>PAID BY</Text>
 						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-							{MEMBERS.map((m) => (
+							{["You", ...(trip?.participants?.map(p => p.name) || [])].map((m) => (
 								<TouchableOpacity
 									key={m}
 									style={[styles.chip, paidBy === m && styles.chipActive]}

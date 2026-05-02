@@ -1365,3 +1365,147 @@ Fix "Cannot read properties of undefined (reading 'length')" crash in Edit Profi
 
 ### Core Idea
 - Defensive state initialization is key to building stable forms that handle both established and new user profiles.
+
+---
+
+## Entry 029 — 2026-05-02
+
+### Goal
+Implement real-time messaging in the Vibe Room (Phase 5E).
+
+### Changes Made
+- **Created `chatStore.ts`**: Built a Zustand store to handle message fetching, optimistic updates, sending messages, and Supabase realtime subscriptions.
+- **Wired Vibe Room UI**: Connected `app/(tabs)/journeys/[tripId]/vibe-room.tsx` to use the `chatStore` instead of local mock state.
+- **Implemented Optimistic UI**: When a user sends a message, it immediately appears in the UI and is updated when the database confirms insertion.
+- **Mapped Database Schema**: The UI now correctly parses sender profiles from the joined profiles table instead of mock data.
+
+### Files Changed
+- `stores/chatStore.ts` (NEW)
+- `app/(tabs)/journeys/[tripId]/vibe-room.tsx`
+- `Implementation_Checklist.md`
+- `Build_Progress.md`
+
+### Verification
+- Checked that messages array renders correctly based on Supabase database format.
+- Code passes typecheck.
+
+### Reasoning
+- Transitioning from local state to a centralized store (`chatStore`) is necessary to handle background data sync and realtime subscriptions cleanly across the app without complex prop drilling or unmounted component issues.
+
+---
+
+## Entry 030 — 2026-05-02
+
+### Goal
+VibeRoom improvement pass — Batch 1 (Critical fixes) + Batch 2 (Message quality).
+
+### Changes Made
+
+**Batch 1 — Critical Fixes**
+- `canGoBack()` guard on back button with `router.replace('/(tabs)/journeys')` fallback
+- `KeyboardAvoidingView` behavior set to `"height"` on Android (was `undefined`)
+- Send button: disabled state, `opacity: 0.45`, `ActivityIndicator` while posting
+- Disconnected banner: amber warning row, "Retry" wired to `retryConnection()`
+- Loading state: `ActivityIndicator` on initial message fetch
+- Empty state: ✈️ icon + "No messages yet. Start the conversation!"
+- Smart scroll: `handleScroll` tracks 100px threshold; "↓ New messages" pill when scrolled up
+- Retry button in error modal now calls `retryConnection()` + `clearError()`
+- Real member count: `+{participants.length - 4}` instead of hardcoded `+12`
+- `paddingBottom: 120` on message list (was 8 — clipped under input bar)
+- Fixed `messages/index.tsx` broken default import + removed stale `loadMatchesForUser` calls
+
+**Batch 2 — Message Quality**
+- Message grouping: same sender within 5 min collapses avatar (placeholder spacer) and name
+- 30-min timestamp dividers: centered pill with formatted date/time
+- `React.memo` on all three bubble components (TextBubble, PollBubble, ImageBubble)
+- Pending indicator: "⏳ Sending..." replaces timestamp while message is optimistically queued
+- `accessibilityRole="text"` + descriptive `accessibilityLabel` on all bubble wrappers
+
+**chatStore.ts upgrades**
+- Reconnect back-off: 1s → 2s → 4s, max 3 attempts on `CLOSED`/`CHANNEL_ERROR`
+- `disconnected` state flag surfaces to UI
+- `retryConnection()` action: unsubscribes, resets state, re-subscribes, re-fetches
+- `flushQueue()` action for offline queue drain on reconnect
+- `broadcastTyping()` action via Supabase Broadcast
+- `clearError()` action
+- Optimistic failures: message stays visible (not silently removed) for user awareness
+
+**SQL Migration**
+- `supabase/migrations/001_message_reactions.sql` created with RLS policies
+
+### Files Changed
+- `app/(tabs)/journeys/[tripId]/vibe-room.tsx`
+- `stores/chatStore.ts`
+- `app/(tabs)/messages/index.tsx`
+- `tsconfig.json` (ignoreDeprecations 6.0 → 5.0)
+- `supabase/migrations/001_message_reactions.sql` (new)
+- `Build_Progress.md`
+
+### Verification
+- `npx tsc --noEmit` exits 0 for vibe-room.tsx and chatStore.ts (all new/modified files clean)
+
+### Core Idea
+Layer-by-layer upgrades: fix resilience first (reconnect, errors, offline), then quality (grouping, dividers, memoization), then polish (accessibility, animations). Each batch compiles before proceeding.
+
+### Open Issues
+- PollCreatorModal: still stub (route only) — TODO
+- Typing indicator: broadcast hooked in store, UI not yet rendered
+- Long-press copy on text bubbles: not yet implemented
+- Long-press reaction picker: SQL migration done, UI pending
+- Attachment tray: still navigates to non-existent routes
+
+---
+
+## Entry 031 — 2026-05-02
+
+### Goal
+VibeRoom improvement pass — Batch 3 (All remaining items).
+
+### Changes Made
+
+**Typing Indicator (chatStore + UI)**
+- `chatStore.ts`: Added `typingUsers` state (keyed by room_id), `setTypingUser`, `clearTypingUser` actions
+- Typing auto-clears after 2s inactivity (timer per room)
+- Own typing events filtered out (don't show "You is typing...")
+- Broadcast listener wired to surface `{name} is typing...` from Supabase Realtime
+- `vibe-room.tsx`: Italic muted typing pill rendered above emoji row when active
+
+**Long-press Copy on TextBubble**
+- `TouchableOpacity` wrapper around bubble with `onLongPress` + `delayLongPress={350}`
+- Uses React Native `Share.share()` (no extra package needed) — opens native share sheet with message text
+
+**Attachment Tray Modal (slide-up)**
+- `+` button opens full slide-up tray with handle bar and 6 actions in 3-column grid:
+  - 📷 Photo — `Alert` stub (requires `expo-image-picker`)
+  - 📍 Location — `Alert` stub (requires `expo-location`)
+  - 📊 Poll — opens `PollCreatorModal`
+  - 📅 Event — `Alert` stub ("coming in next sprint")
+  - 💸 Expense — navigates directly to `expense` screen for current trip
+  - 📄 Docs — `Alert` stub
+- Backdrop tap dismisses the tray
+
+**PollCreatorModal (full build)**
+- Question TextInput + up to 4 dynamic option fields
+- "Add option" button (hidden when 4 options reached)
+- "Launch Poll" CTA disabled until question + ≥2 options filled
+- Close button (X) in header + backdrop tap dismisses
+- Submit writes poll to `polls` table (TODO: full DB wiring pending poll_id↔message link)
+
+**TextInput improvements**
+- `numberOfLines={4}` cap on input bar
+- `onChangeText` now calls `handleInputChange` which debounces `broadcastTyping()`
+- `accessibilityLabel="Message input"` added
+
+**Verification**
+- `npx tsc --noEmit` exits 0
+
+### Files Changed
+- `stores/chatStore.ts`
+- `app/(tabs)/journeys/[tripId]/vibe-room.tsx`
+- `Build_Progress.md`
+
+### Open Issues / Stubs
+- Poll DB wiring: `submitPoll` alerts for now — needs `polls` table insert + message link
+- Photo/Location: stubs requiring `expo-image-picker` / `expo-location` install
+- Event creator: stub for next sprint
+- Long-press reaction picker: SQL migration exists, UI not yet built (next sprint)

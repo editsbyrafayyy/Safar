@@ -88,15 +88,16 @@ type TripState = {
     ledger: ExpenseLedger | null;
     expenses: Expense[];
   }>;
-  featuredTrip: NewTrip | null;
+  featuredTrips: NewTrip[];
   exploreJourneys: NewTrip[];
   loadTripsForCurrentUser: () => Promise<void>;
   loadTripById: (tripId: string) => Promise<void>;
   loadExploreContent: () => Promise<void>;
   refresh: () => Promise<void>;
-  addToWishlist: (item: { id: string; title: string; image: string; subtitle?: string }) => void;
+  addToWishlist: (item: { id: string; title: string; image: string; subtitle?: string; note?: string }) => void;
   removeFromWishlist: (itemId: string) => void;
   isWishlisted: (itemId: string) => boolean;
+  addTrip: (data: { title: string; destination: string; startDate: Date; endDate: Date }) => Promise<void>;
 };
 
 export const useTripStore = create<TripState>((set, get) => ({
@@ -105,7 +106,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   loading: false,
   error: null,
   tripDetails: {},
-  featuredTrip: null,
+  featuredTrips: [],
   exploreJourneys: [],
 
   addToWishlist: (item) => {
@@ -125,6 +126,35 @@ export const useTripStore = create<TripState>((set, get) => ({
 
   refresh: async () => {
     await get().loadTripsForCurrentUser();
+  },
+
+  addTrip: async ({ title, destination, startDate, endDate }: { title: string; destination: string; startDate: Date; endDate: Date; dates?: string }) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+    
+    const { data: trip, error } = await supabase.from('trips').insert({
+      owner_id: user.id,
+      title,
+      destination,
+      status: 'Upcoming',
+      start_date: startDate.toISOString(),
+      end_date: endDate.toISOString(),
+      hero_image_url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80'
+    }).select().single();
+
+    if (error) {
+      console.error('Error creating trip:', error);
+      throw error;
+    }
+
+    if (trip) {
+      // Manually create an initial itinerary and vibe room if no triggers exist
+      await supabase.from('itineraries').insert({ trip_id: trip.id, duration_days: 7 });
+      await supabase.from('vibe_rooms').insert({ trip_id: trip.id, session_status: 'active' });
+      await supabase.from('trip_participants').insert({ trip_id: trip.id, user_id: user.id, role: 'owner' });
+
+      await get().loadTripsForCurrentUser();
+    }
   },
 
   loadTripsForCurrentUser: async () => {
@@ -232,18 +262,20 @@ export const useTripStore = create<TripState>((set, get) => ({
         .eq('status', 'Upcoming')
         .not('hero_image_url', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(3);
 
       // 2. Fetch Explore Journeys (other upcoming trips or agency itineraries)
-      const { data: journeys } = await supabase
-        .from('trips')
-        .select('*')
-        .neq('id', featured?.id || '')
-        .limit(6);
+      const featuredIds = featured?.map(t => t.id) || [];
+      let query = supabase.from('trips').select('*').limit(6);
+      
+      if (featuredIds.length > 0) {
+        query = query.not('id', 'in', `(${featuredIds.join(',')})`);
+      }
+      
+      const { data: journeys } = await query;
 
       set({ 
-        featuredTrip: featured ?? null, 
+        featuredTrips: featured ?? [], 
         exploreJourneys: journeys ?? [],
         loading: false 
       });

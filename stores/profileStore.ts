@@ -44,7 +44,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   nearbyTravelers: [],
   followerProfiles: [],
 
-  setProfile: (p) => set((s) => ({ ...s, profile: { ...(s.profile || {}), ...p } })),
+  setProfile: (p) => set((s) => ({ ...s, profile: { ...(s.profile || {}), ...p } as any })),
 
   loadCurrentProfile: async () => {
     const auth = useAuthStore.getState();

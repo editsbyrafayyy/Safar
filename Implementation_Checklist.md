@@ -45,7 +45,7 @@ Latest completed UI milestone: Entry 018 in `Build_Progress.md`.
 
 - [x] `stores/authStore.ts` (session, login/logout, loading/error)
 - [x] `stores/tripStore.ts` (newTrips + wishlist; addTrip, addToWishlist, removeFromWishlist, isWishlisted)
-- [ ] `stores/chatStore.ts` (room messages, queue, poll state, reconnect)
+- [x] `stores/chatStore.ts` (room messages, queue, poll state, reconnect)
 - [ ] `stores/safetyStore.ts` (SOS state, contacts, location flags)
 - [x] `stores/profileStore.ts` (name, bio, travelStyles, languages; setProfile)
 - [ ] Add persist strategy for offline-safe state where needed
@@ -105,15 +105,31 @@ Latest completed UI milestone: Entry 018 in `Build_Progress.md`.
 - [ ] Itinerary builder: add/edit stops (F13 — currently read-only)
 
 ### 5E Vibe Room (Realtime)
-- [ ] Room message fetch/send via Supabase
-- [ ] Realtime subscription + cleanup
+- [x] Room message fetch/send via Supabase
+- [x] Realtime subscription + cleanup
+- [x] Realtime reconnect back-off (1s→2s→4s, max 3 attempts, disconnected banner)
 - [x] Pinned itinerary card
 - [x] Today's Brief collapsible card (temperature, sunset, next stop, days left)
 - [x] Quick Actions strip (Photo, Location, Poll, Event, Docs)
 - [x] Emoji reaction strip above input
 - [x] Poll UI (vote UI rendered from mock message data)
-- [x] Sync interrupted error state + retry (UI)
-- [x] Back button 44×44 with `hitSlop` (Issue 4 fix)
+- [x] Sync interrupted error state + retry (UI — wired to retryConnection)
+- [x] Back button 44×44 with `hitSlop` + `canGoBack()` guard
+- [x] Send button disabled state + ActivityIndicator while posting
+- [x] Loading / empty / disconnected states
+- [x] Smart scroll: "↓ New messages" pill when user is scrolled up
+- [x] Message grouping: consecutive same-sender within 5min collapses avatar
+- [x] 30-min timestamp dividers between messages
+- [x] React.memo on all bubble components
+- [x] Optimistic pending indicator (⏳ Sending...)
+- [x] accessibilityLabel + accessibilityRole on all bubble components
+- [ ] PollCreatorModal (full build — currently stub route)
+- [x] PollCreatorModal UI built (question + up to 4 options + launch CTA; DB wiring TODO)
+- [x] Typing indicator UI (broadcast wired in store + italic pill rendered)
+- [x] Long-press copy on text bubbles (Share.share native sheet)
+- [x] Attachment tray slide-up modal (6 actions: Photo stub, Location stub, Poll → PollModal, Event stub, Expense → navigate, Docs stub)
+- [ ] Long-press reaction picker (SQL migration done, UI pending)
+- [ ] Poll DB wiring (polls table insert + message link)
 
 ### 5F Expense Ledger
 - [x] Expense list row rendering (F28)

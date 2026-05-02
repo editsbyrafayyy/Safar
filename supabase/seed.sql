@@ -1,58 +1,47 @@
 -- SAFAR Demo Seed Data
+INSERT INTO auth.users (id, email) VALUES
+('11111111-1111-4111-a111-111111111111', 'amina@example.com'),
+('22222222-2222-4222-a222-222222222222', 'zain@example.com'),
+('33333333-3333-4333-a333-333333333333', 'maha@example.com'),
+('44444444-4444-4444-a444-444444444444', 'rayan@example.com'),
+('55555555-5555-4555-a555-555555555555', 'sana@example.com'),
+('66666666-6666-4666-a666-666666666666', 'tariq@example.com'),
+('77777777-7777-4777-a777-777777777777', 'leila@example.com'),
+('88888888-8888-4888-a888-888888888888', 'omar@example.com');
 
--- We will insert agencies, users, traveler profiles, and some trips/expenses.
--- NOTE: We use specific UUIDs so we can reference them across tables reliably.
-
--- UUIDs:
--- Julian Thorne: 'a1b2c3d4-e5f6-4a1b-8c9d-012345678901'
--- Amina Al-Farsi: 'b2c3d4e5-f6a1-4b2c-9d0e-123456789012'
--- Elias Thorne: 'c3d4e5f6-a1b2-4c3d-0e1f-234567890123'
--- Silk Road Trip: 'd4e5f6a1-b2c3-4d4e-1f2a-345678901234'
--- Kashi Journeys: 'e5f6a1b2-c3d4-4e5f-2a3b-456789012345'
--- Nomad Silk Road: 'f6a1b2c3-d4e5-4f6a-3b4c-567890123456'
--- The Nabataean Guild: '01234567-89ab-4cde-f012-34567890abcd'
--- Abyssinian Heritage: '12345678-9abc-4def-0123-4567890abcde'
--- Expense Ledger: '23456789-abcd-4ef0-1234-567890abcdef'
-
--- AGENCIES
-INSERT INTO agencies (id, name, region, star_rating, review_count, philosophy, certification_badges, established_year, specialty, hero_image_url, is_dts_verified) VALUES
-('e5f6a1b2-c3d4-4e5f-2a3b-456789012345', 'Kashi Journeys', 'India', 4.8, 120, 'Spiritual architecture + Varanasi river expeditions', ARRAY['DTS-Certified', 'Heritage Pro'], 1984, 'Spiritual Heritage', 'https://images.unsplash.com/photo-1561361513-2d000a50f0dc?auto=format&fit=crop&w=1200&q=80', true),
-('f6a1b2c3-d4e5-4f6a-3b4c-567890123456', 'Nomad Silk Road', 'Central Asia', 4.9, 310, 'Central Asian heritage, Registan, Kyzylkum', ARRAY['DTS-Certified', 'Expedition Leader'], 1992, 'Overland Silk Road', 'https://images.unsplash.com/photo-1549488344-c1122da1efb4?auto=format&fit=crop&w=1200&q=80', true),
-('01234567-89ab-4cde-f012-34567890abcd', 'The Nabataean Guild', 'Middle East', 4.7, 85, 'Desert kingdoms, Middle East spice routes', ARRAY['DTS-Certified'], 2005, 'Desert Archaeology', 'https://images.unsplash.com/photo-1580834341580-8c11078444a9?auto=format&fit=crop&w=1200&q=80', true),
-('12345678-9abc-4def-0123-4567890abcde', 'Abyssinian Heritage', 'Ethiopia', 4.6, 52, 'Ethiopian Orthodox history, Simien Highlands', ARRAY['DTS-Certified'], 2011, 'Highland Trekking', 'https://images.unsplash.com/photo-1555029053-29402e604f37?auto=format&fit=crop&w=1200&q=80', true)
-ON CONFLICT (id) DO NOTHING;
-
--- PROFILES
 INSERT INTO profiles (id, email, name, profile_photo_url, bio, membership_tier) VALUES
-('a1b2c3d4-e5f6-4a1b-8c9d-012345678901', 'julian@example.com', 'Julian Thorne', 'https://i.pravatar.cc/150?u=a1b2c3d4', 'The Global Archivist. London based.', 'elite'),
-('b2c3d4e5-f6a1-4b2c-9d0e-123456789012', 'amina@example.com', 'Amina Al-Farsi', 'https://i.pravatar.cc/150?u=b2c3d4e5', 'Professional Curator based in Muscat, Oman.', 'elite'),
-('c3d4e5f6-a1b2-4c3d-0e1f-234567890123', 'elias@example.com', 'Elias Thorne', 'https://i.pravatar.cc/150?u=c3d4e5f6', 'Curator & Heritage Explorer.', 'premium')
-ON CONFLICT (id) DO NOTHING;
+('11111111-1111-4111-a111-111111111111', 'amina@example.com', 'Amina Al-Farsi', 'https://picsum.photos/seed/amina/600/800', 'Chasing the architectural soul of the Silk Road.', 'elite'),
+('22222222-2222-4222-a222-222222222222', 'zain@example.com', 'Zain Malik', 'https://picsum.photos/seed/zainm/600/800', 'Mountain silence and glacier routes are my reset button.', 'elite'),
+('33333333-3333-4333-a333-333333333333', 'maha@example.com', 'Maha Noor', 'https://picsum.photos/seed/mahanoor/600/800', 'Itinerary builder who structures routes around food markets.', 'elite'),
+('44444444-4444-4444-a444-444444444444', 'rayan@example.com', 'Rayan Khalid', 'https://picsum.photos/seed/rayank/600/800', 'Desert routes, stargazing camps, and camel caravan evenings.', 'elite'),
+('55555555-5555-4555-a555-555555555555', 'sana@example.com', 'Sana Hussain', 'https://picsum.photos/seed/sanahussain/600/800', 'Wellness-first traveler who builds routes around thermal springs.', 'elite'),
+('66666666-6666-4666-a666-666666666666', 'tariq@example.com', 'Tariq Bashir', 'https://picsum.photos/seed/tariqb/600/800', 'Oral history collector.', 'elite'),
+('77777777-7777-4777-a777-777777777777', 'leila@example.com', 'Leila Ahmadi', 'https://picsum.photos/seed/leilaa/600/800', 'Textile trail researcher.', 'elite'),
+('88888888-8888-4888-a888-888888888888', 'omar@example.com', 'Omar Faris', 'https://picsum.photos/seed/omarfaris/600/800', 'Luxury lodge scout.', 'elite');
 
--- TRAVELER PROFILES
-INSERT INTO traveler_profiles (user_id, destinations_visited, travel_style, travel_pace, interest_tags, persona_dna, curation_score, expeditions_count, heritage_points) VALUES
-('a1b2c3d4-e5f6-4a1b-8c9d-012345678901', 42, 'Comfort', 'Moderate', ARRAY['Heritage', 'Photography', 'Food'], '{"heritage": 0.9, "culinary": 0.6, "urban": 0.7, "nature": 0.4, "adventure": 0.5, "relaxation": 0.3}'::jsonb, 94.8, 25, 12500),
-('b2c3d4e5-f6a1-4b2c-9d0e-123456789012', 38, 'Comfort', 'Moderate', ARRAY['Heritage', 'Culture', 'Architecture'], '{"heritage": 0.85, "culinary": 0.7, "urban": 0.6, "nature": 0.5, "adventure": 0.8, "relaxation": 0.4}'::jsonb, 92.1, 22, 11200),
-('c3d4e5f6-a1b2-4c3d-0e1f-234567890123', 14, 'Adventure', 'Fast', ARRAY['History', 'Trekking', 'Photography'], '{"heritage": 0.8, "culinary": 0.5, "urban": 0.4, "nature": 0.7, "adventure": 0.9, "relaxation": 0.2}'::jsonb, 88.5, 14, 8200)
-ON CONFLICT (user_id) DO NOTHING;
+INSERT INTO traveler_profiles (user_id, travel_style, interest_tags, persona_dna) VALUES
+('11111111-1111-4111-a111-111111111111', 'Comfort', ARRAY['Heritage', 'Photography', 'Slow Travel'], '{"adventure": 0.62, "culture": 0.96, "relaxation": 0.55, "urban": 0.7}'::jsonb),
+('22222222-2222-4222-a222-222222222222', 'Comfort', ARRAY['Mountain Seeker', 'Tea Trails', 'Minimalist'], '{"adventure": 0.85, "culture": 0.72, "relaxation": 0.8, "urban": 0.45}'::jsonb),
+('33333333-3333-4333-a333-333333333333', 'Comfort', ARRAY['Food Explorer', 'Route Sync', 'Cultural Dive'], '{"adventure": 0.68, "culture": 0.9, "relaxation": 0.6, "urban": 0.88}'::jsonb),
+('44444444-4444-4444-a444-444444444444', 'Comfort', ARRAY['Desert Nomad', 'Night Sky', 'Off-Grid'], '{"adventure": 0.92, "culture": 0.58, "relaxation": 0.7, "urban": 0.52}'::jsonb),
+('55555555-5555-4555-a555-555555555555', 'Comfort', ARRAY['Wellness', 'Forest Bathing', 'Journal'], '{"adventure": 0.55, "culture": 0.78, "relaxation": 0.65, "urban": 0.72}'::jsonb),
+('66666666-6666-4666-a666-666666666666', 'Comfort', ARRAY['Heritage', 'Documentary', 'Local Connect'], '{"adventure": 0.48, "culture": 0.98, "relaxation": 0.75, "urban": 0.82}'::jsonb),
+('77777777-7777-4777-a777-777777777777', 'Comfort', ARRAY['Research', 'Textiles', 'Slow Overland'], '{"adventure": 0.6, "culture": 0.95, "relaxation": 0.55, "urban": 0.6}'::jsonb),
+('88888888-8888-4888-a888-888888888888', 'Comfort', ARRAY['Boutique Stays', 'Fine Dining', 'Curated Routes'], '{"adventure": 0.58, "culture": 0.7, "relaxation": 0.3, "urban": 0.8}'::jsonb);
 
--- DEMO TRIP
+-- TRIPS
 INSERT INTO trips (id, owner_id, title, destination, start_date, end_date, status, hero_image_url) VALUES
-('d4e5f6a1-b2c3-4d4e-1f2a-345678901234', 'a1b2c3d4-e5f6-4a1b-8c9d-012345678901', 'Silk Road Expedition: Samarkand to Bukhara', 'Uzbekistan', '2026-09-10', '2026-09-24', 'Upcoming', 'https://images.unsplash.com/photo-1549488344-c1122da1efb4?auto=format&fit=crop&w=1200&q=80')
-ON CONFLICT (id) DO NOTHING;
+('aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa', '11111111-1111-4111-a111-111111111111', 'Karakoram Expedition', 'Hunza Valley', '2026-05-12', '2026-05-19', 'Upcoming', 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=1200&q=80'),
+('bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb', '11111111-1111-4111-a111-111111111111', 'Murree Retreat', 'Murree', '2025-01-08', '2025-01-11', 'Completed', 'https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=900&q=80'),
+('cccccccc-cccc-4ccc-cccc-cccccccccccc', '11111111-1111-4111-a111-111111111111', 'Naran Valley', 'Kaghan', '2024-07-17', '2024-07-22', 'Completed', 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=900&q=80'),
+('dddddddd-dddd-4ddd-dddd-dddddddddddd', '11111111-1111-4111-a111-111111111111', 'Annapurna Circuit', 'Nepal', '2026-09-04', '2026-09-18', 'BookingStage', 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1200&q=80');
 
 INSERT INTO trip_participants (trip_id, user_id) VALUES
-('d4e5f6a1-b2c3-4d4e-1f2a-345678901234', 'a1b2c3d4-e5f6-4a1b-8c9d-012345678901'),
-('d4e5f6a1-b2c3-4d4e-1f2a-345678901234', 'b2c3d4e5-f6a1-4b2c-9d0e-123456789012')
-ON CONFLICT (trip_id, user_id) DO NOTHING;
-
--- EXPENSE LEDGER & EXPENSES
-INSERT INTO expense_ledgers (id, trip_id, total_group_spend, user_balances) VALUES
-('23456789-abcd-4ef0-1234-567890abcdef', 'd4e5f6a1-b2c3-4d4e-1f2a-345678901234', 1245.50, '{"a1b2c3d4-e5f6-4a1b-8c9d-012345678901": -180.35, "b2c3d4e5-f6a1-4b2c-9d0e-123456789012": 180.35}'::jsonb)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO expenses (ledger_id, paid_by_user_id, amount_pkr, category, split_method, split_data, is_verified, expense_date) VALUES
-('23456789-abcd-4ef0-1234-567890abcdef', 'b2c3d4e5-f6a1-4b2c-9d0e-123456789012', 84.20, 'Dining', 'Equal', null, true, '2026-09-11'),
-('23456789-abcd-4ef0-1234-567890abcdef', 'a1b2c3d4-e5f6-4a1b-8c9d-012345678901', 120.00, 'Activity', 'Equal', null, true, '2026-09-12'),
-('23456789-abcd-4ef0-1234-567890abcdef', 'b2c3d4e5-f6a1-4b2c-9d0e-123456789012', 450.00, 'Transport', 'Equal', null, true, '2026-09-13'),
-('23456789-abcd-4ef0-1234-567890abcdef', 'a1b2c3d4-e5f6-4a1b-8c9d-012345678901', 15.00, 'Activity', 'Custom', '{"a1b2c3d4-e5f6-4a1b-8c9d-012345678901": 15.0}'::jsonb, true, '2026-09-14');
+('aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa', '11111111-1111-4111-a111-111111111111'),
+('aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa', '22222222-2222-4222-a222-222222222222'),
+('bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb', '11111111-1111-4111-a111-111111111111'),
+('bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb', '22222222-2222-4222-a222-222222222222'),
+('cccccccc-cccc-4ccc-cccc-cccccccccccc', '11111111-1111-4111-a111-111111111111'),
+('cccccccc-cccc-4ccc-cccc-cccccccccccc', '22222222-2222-4222-a222-222222222222'),
+('dddddddd-dddd-4ddd-dddd-dddddddddddd', '11111111-1111-4111-a111-111111111111'),
+('dddddddd-dddd-4ddd-dddd-dddddddddddd', '22222222-2222-4222-a222-222222222222');

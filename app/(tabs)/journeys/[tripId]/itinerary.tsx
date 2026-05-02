@@ -10,7 +10,7 @@ export default function ItineraryScreen() {
 	const router = useRouter();
 	const { tripId } = useLocalSearchParams<{ tripId: string }>();
 	const { tripDetails, loadTripById } = useTripStore();
-	const trip = tripId && tripDetails[tripId as string];
+	const trip = typeof tripId === 'string' ? tripDetails[tripId] : undefined;
 
 	useEffect(() => {
 		if (tripId) {

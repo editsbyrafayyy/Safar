@@ -36,8 +36,18 @@ export default function JourneysScreen() {
       <SafarHeader />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         <View style={styles.titleSection}>
-          <Text style={styles.super}>YOUR EXPEDITIONS</Text>
-          <Text style={styles.pageTitle}>The Nomad&apos;s{"\n"}Journey</Text>
+          <View>
+            <Text style={styles.super}>YOUR EXPEDITIONS</Text>
+            <Text style={styles.pageTitle}>The Nomad&apos;s{"\n"}Journey</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => router.push('/(tabs)/journeys/new-journey')}
+            accessibilityLabel="Create new trip"
+          >
+            <Ionicons name="add" size={20} color={Colors.textOnDark} />
+            <Text style={styles.addBtnText}>New Trip</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.tabRow}>
@@ -307,9 +317,24 @@ export default function JourneysScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
-  titleSection: { paddingHorizontal: Spacing.screen, paddingTop: 8, paddingBottom: 4 },
+  titleSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: Spacing.screen, paddingTop: 8, paddingBottom: 4 },
   super: { ...Typography.label, color: Colors.textMuted, marginBottom: 4 },
   pageTitle: { ...Typography.h1, color: Colors.textPrimary, lineHeight: 36 },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.brand,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: Radius.pill,
+    marginBottom: 6,
+  },
+  addBtnText: {
+    ...Typography.label,
+    color: Colors.textOnDark,
+    fontSize: 12,
+  },
   tabRow: { flexDirection: "row", paddingHorizontal: Spacing.screen, marginBottom: 16, marginTop: 12 },
   tabBtn: { marginRight: 20, paddingBottom: 6 },
   tabText: { ...Typography.h4, color: Colors.textMuted },

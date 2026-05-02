@@ -2,75 +2,266 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 
-export type MatchRoom = {
-  id: string; // match row id
-  other_id: string;
-  other_name?: string | null;
-  other_avatar?: string | null;
-  match_percentage?: number | null;
-  status?: string | null;
+export type ChatMessage = {
+  id: string;
+  room_id: string;
+  sender_id: string;
+  content: string;
+  type: 'Text' | 'Image' | 'Poll';
+  sent_at: string;
+  delivered: boolean;
+  pending?: boolean; // optimistic / queued
+  sender_profile?: {
+    name: string;
+    profile_photo_url: string;
+  };
+};
+
+type QueuedMessage = {
+  roomId: string;
+  content: string;
+  type: 'Text' | 'Image' | 'Poll';
+  tempId: string;
 };
 
 type ChatState = {
-  rooms: MatchRoom[];
-  loading: boolean;
-  error?: string | null;
-  loadMatchesForCurrentUser: () => Promise<void>;
-  loadMatchesForUser: (id: string) => Promise<void>;
+  messages: Record<string, ChatMessage[]>; // keyed by room_id
+  loadingRooms: Record<string, boolean>;
+  error: string | null;
+  disconnected: boolean;
+  activeSubscriptions: Record<string, boolean>;
+  queue: QueuedMessage[]; // offline queue
+  typingUsers: Record<string, { userId: string; name: string; timer: ReturnType<typeof setTimeout> | null }>; // keyed by room_id
+
+  loadMessages: (roomId: string) => Promise<void>;
+  sendMessage: (roomId: string, content: string, type?: 'Text' | 'Image' | 'Poll') => Promise<void>;
+  subscribeToRoom: (roomId: string) => void;
+  unsubscribeFromRoom: (roomId: string) => void;
+  retryConnection: (roomId: string) => void;
+  flushQueue: () => Promise<void>;
+  broadcastTyping: (roomId: string) => void;
+  clearError: () => void;
+  setTypingUser: (roomId: string, userId: string, name: string) => void;
+  clearTypingUser: (roomId: string) => void;
 };
 
-export const useChatStore = create<ChatState>((set, get) => ({
-  rooms: [],
-  loading: false,
-  error: null,
+// Reconnect back-off attempts: 1s → 2s → 4s
+const BACKOFF_DELAYS = [1000, 2000, 4000];
 
-  loadMatchesForCurrentUser: async () => {
-    const auth = useAuthStore.getState();
-    const user = auth.user;
-    if (!user) return;
-    await get().loadMatchesForUser(user.id);
+export const useChatStore = create<ChatState>((set, get) => ({
+  messages: {},
+  loadingRooms: {},
+  error: null,
+  disconnected: false,
+  activeSubscriptions: {},
+  queue: [],
+  typingUsers: {},
+
+  clearError: () => set({ error: null }),
+
+  setTypingUser: (roomId, userId, name) => {
+    const existing = get().typingUsers[roomId];
+    if (existing?.timer) clearTimeout(existing.timer);
+    const timer = setTimeout(() => get().clearTypingUser(roomId), 2000);
+    set((s) => ({ typingUsers: { ...s.typingUsers, [roomId]: { userId, name, timer } } }));
   },
 
-  loadMatchesForUser: async (id: string) => {
-    set({ loading: true, error: null });
+  clearTypingUser: (roomId) => {
+    const existing = get().typingUsers[roomId];
+    if (existing?.timer) clearTimeout(existing.timer);
+    set((s) => {
+      const updated = { ...s.typingUsers };
+      delete updated[roomId];
+      return { typingUsers: updated };
+    });
+  },
+
+  loadMessages: async (roomId: string) => {
+    set((state) => ({
+      loadingRooms: { ...state.loadingRooms, [roomId]: true },
+      error: null,
+    }));
     try {
-      const { data: matches, error } = await supabase
-        .from('matches')
-        .select('*')
-        .or(`requester_id.eq.${id},target_id.eq.${id}`);
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*, sender_profile:profiles(name, profile_photo_url)')
+        .eq('room_id', roomId)
+        .order('sent_at', { ascending: true });
 
-      if (error) {
-        set({ loading: false, error: error.message || String(error) });
-        return;
-      }
+      if (error) throw error;
 
-      const otherIds = (matches ?? []).map((m: any) => (m.requester_id === id ? m.target_id : m.requester_id));
-      const uniqueIds = Array.from(new Set(otherIds));
-
-      let profilesMap: Record<string, any> = {};
-      if (uniqueIds.length > 0) {
-        const { data: profiles } = await supabase.from('profiles').select('id, name, profile_photo_url').in('id', uniqueIds);
-        profilesMap = (profiles ?? []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
-      }
-
-      const rooms: MatchRoom[] = (matches ?? []).map((m: any) => {
-        const other = m.requester_id === id ? m.target_id : m.requester_id;
-        const prof = profilesMap[other] ?? {};
-        return {
-          id: m.id || `${m.requester_id}-${m.target_id}`,
-          other_id: other,
-          other_name: prof.name ?? null,
-          other_avatar: prof.profile_photo_url ?? null,
-          match_percentage: m.match_percentage ?? null,
-          status: m.status ?? null,
-        } as MatchRoom;
-      });
-
-      set({ rooms, loading: false });
-    } catch (e: any) {
-      set({ loading: false, error: e?.message || String(e) });
+      set((state) => ({
+        messages: { ...state.messages, [roomId]: (data ?? []) as any[] },
+        loadingRooms: { ...state.loadingRooms, [roomId]: false },
+      }));
+    } catch (err: any) {
+      set((state) => ({
+        error: err.message || 'Failed to load messages',
+        loadingRooms: { ...state.loadingRooms, [roomId]: false },
+      }));
     }
   },
-}));
 
-export default useChatStore;
+  sendMessage: async (roomId: string, content: string, type = 'Text') => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    const tempId = `temp-${Date.now()}`;
+    const newMsg: ChatMessage = {
+      id: tempId,
+      room_id: roomId,
+      sender_id: user.id,
+      content,
+      type,
+      sent_at: new Date().toISOString(),
+      delivered: false,
+      pending: true,
+      sender_profile: {
+        name: user.user_metadata?.name || 'You',
+        profile_photo_url: user.user_metadata?.avatar_url || '',
+      },
+    };
+
+    // Optimistic insert
+    set((state) => ({
+      messages: {
+        ...state.messages,
+        [roomId]: [...(state.messages[roomId] || []), newMsg],
+      },
+    }));
+
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({ room_id: roomId, sender_id: user.id, content, type, delivered: true })
+        .select('*, sender_profile:profiles(name, profile_photo_url)')
+        .single();
+
+      if (error) throw error;
+
+      // Replace temp with confirmed message
+      set((state) => ({
+        messages: {
+          ...state.messages,
+          [roomId]: (state.messages[roomId] || []).map((msg) =>
+            msg.id === tempId ? ({ ...(data as any), pending: false } as ChatMessage) : msg
+          ),
+        },
+      }));
+    } catch (err: any) {
+      // Mark message as failed — do NOT silently remove it
+      set((state) => ({
+        messages: {
+          ...state.messages,
+          [roomId]: (state.messages[roomId] || []).map((msg) =>
+            msg.id === tempId ? { ...msg, pending: false, delivered: false } : msg
+          ),
+        },
+        error: err.message || 'Failed to send message',
+      }));
+    }
+  },
+
+  subscribeToRoom: (roomId: string) => {
+    if (get().activeSubscriptions[roomId]) return;
+
+    let attempt = 0;
+
+    const connect = () => {
+      const channel = supabase
+        .channel(`room:${roomId}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
+          async (payload) => {
+            const incoming = payload.new as ChatMessage;
+            const currentUser = useAuthStore.getState().user;
+            // Skip own messages — already inserted optimistically
+            if (currentUser && incoming.sender_id === currentUser.id) return;
+
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('name, profile_photo_url')
+              .eq('id', incoming.sender_id)
+              .single();
+
+            const full: ChatMessage = { ...incoming, sender_profile: profile ?? undefined };
+
+            set((s) => {
+              const current = s.messages[roomId] || [];
+              if (current.some((m) => m.id === full.id)) return s; // dedupe
+              return { messages: { ...s.messages, [roomId]: [...current, full] } };
+            });
+          }
+        )
+        .on('broadcast', { event: 'typing' }, (payload) => {
+          const { user_id, name } = payload.payload as { user_id: string; name: string };
+          const currentUser = useAuthStore.getState().user;
+          if (currentUser && user_id === currentUser.id) return; // don't show own typing
+          get().setTypingUser(roomId, user_id, name);
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            attempt = 0;
+            set({ disconnected: false });
+          }
+          if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            set({ disconnected: true });
+            if (attempt < BACKOFF_DELAYS.length) {
+              const delay = BACKOFF_DELAYS[attempt];
+              attempt += 1;
+              setTimeout(() => {
+                supabase.removeChannel(channel);
+                connect();
+              }, delay);
+            }
+            // After max attempts, leave disconnected banner visible for manual retry
+          }
+        });
+    };
+
+    connect();
+
+    set((s) => ({
+      activeSubscriptions: { ...s.activeSubscriptions, [roomId]: true },
+    }));
+  },
+
+  unsubscribeFromRoom: (roomId: string) => {
+    supabase.channel(`room:${roomId}`).unsubscribe();
+    supabase.removeChannel(supabase.channel(`room:${roomId}`));
+    set((s) => {
+      const updated = { ...s.activeSubscriptions };
+      delete updated[roomId];
+      return { activeSubscriptions: updated };
+    });
+  },
+
+  retryConnection: (roomId: string) => {
+    const { unsubscribeFromRoom, subscribeToRoom, loadMessages } = get();
+    unsubscribeFromRoom(roomId);
+    set({ disconnected: false, error: null });
+    subscribeToRoom(roomId);
+    loadMessages(roomId);
+  },
+
+  flushQueue: async () => {
+    const { queue, sendMessage } = get();
+    if (queue.length === 0) return;
+    const pending = [...queue];
+    set({ queue: [] });
+    for (const item of pending) {
+      await sendMessage(item.roomId, item.content, item.type);
+    }
+  },
+
+  broadcastTyping: (roomId: string) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+    supabase.channel(`room:${roomId}`).send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { user_id: user.id, name: user.user_metadata?.name || 'Someone' },
+    });
+  },
+}));

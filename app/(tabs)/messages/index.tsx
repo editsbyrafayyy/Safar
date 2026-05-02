@@ -11,10 +11,12 @@ import {
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import BottomTabBar from "@/components/layouts/BottomTabBar";
-import { useEffect } from 'react';
-import { useAuthStore } from '@/stores/authStore';
-import useChatStore from '@/stores/chatStore';
+
 import { Colors, Spacing, Radius, Typography } from "@/constants/Theme";
+import { useChatStore } from "@/stores/chatStore";
+import { useAuthStore } from "@/stores/authStore";
+import { supabase } from "@/lib/supabase";
+import { useEffect } from "react";
 
 type Room = {
   id: string;
@@ -30,61 +32,60 @@ type RoomMessage = {
   isMine?: boolean;
 };
 
-const CHAT_ROOMS: Room[] = [
-  { id: "kashi-core", name: "Kashi Core", subtitle: "Day 3 coordination", unread: 2 },
-  { id: "gear-lodge", name: "Gear & Lodge", subtitle: "Packing + stays", unread: 0 },
-  { id: "media-drops", name: "Media Drops", subtitle: "Photos and clips", unread: 5 },
-];
 
-const INITIAL_MESSAGES: Record<string, RoomMessage[]> = {
-  "kashi-core": [
-    { id: "m1", sender: "Amara", text: "Does everyone have the exact location for the sunrise boat meet-up?" },
-    { id: "m2", sender: "Julian", text: "I pinned the coordinates in the ledger. It’s by the temple entrance." },
-    { id: "m3", sender: "You", text: "Perfect. I’ll be there at 5:40 AM.", isMine: true },
-  ],
-  "gear-lodge": [
-    { id: "m4", sender: "Zain", text: "Bring thermal gloves, wind is stronger tonight." },
-    { id: "m5", sender: "You", text: "Noted. I’ll share the final checklist in 10 mins.", isMine: true },
-  ],
-  "media-drops": [
-    { id: "m6", sender: "Areeba", text: "Drop your best mountain shots here." },
-    { id: "m7", sender: "You", text: "Uploading sunrise sequence after breakfast.", isMine: true },
-  ],
-};
 
 export default function MessagesScreen() {
-  const [rooms, setRooms] = useState(CHAT_ROOMS);
-  const [activeRoom, setActiveRoom] = useState(CHAT_ROOMS[0].id);
-  const [roomMessages, setRoomMessages] = useState(INITIAL_MESSAGES);
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [activeRoom, setActiveRoom] = useState<string>("");
+  const { user } = useAuthStore();
+  const { messages: storeMessages, loadMessages, sendMessage, subscribeToRoom, unsubscribeFromRoom } = useChatStore();
 
-  const auth = useAuthStore();
-  const chat = useChatStore();
-  const storeRooms = useChatStore((s) => s.rooms);
-
-  useEffect(() => {
-    // load matches for the signed-in user and present them as chat rooms
-    (async () => {
-      if (auth.user) {
-        await chat.loadMatchesForUser(auth.user.id);
-        // rooms will also be updated via the storeRooms subscription below
-      }
-    })();
-  }, [auth.user]);
-
-  useEffect(() => {
-    if (!storeRooms || storeRooms.length === 0) return;
-    const mapped = storeRooms.map((r) => ({ id: r.id, name: r.other_name ?? 'Traveler', subtitle: r.status ?? '', unread: 0 }));
-    setRooms(mapped);
-    setActiveRoom((prev) => mapped.find((m) => m.id === prev)?.id ?? mapped[0].id);
-  }, [storeRooms.length]);
   const [draft, setDraft] = useState("");
   const [roomQuery, setRoomQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [actionNote, setActionNote] = useState("");
   const scrollRef = useRef<ScrollView>(null);
 
-  const messages = useMemo(() => roomMessages[activeRoom] ?? [], [roomMessages, activeRoom]);
-  const activeRoomMeta = rooms.find((r) => r.id === activeRoom) ?? rooms[0] ?? CHAT_ROOMS[0];
+  useEffect(() => {
+    if (!user) return;
+    const fetchRooms = async () => {
+      const { data: partData } = await supabase.from('trip_participants').select('trip_id').eq('user_id', user.id);
+      const tripIds = partData?.map((p: any) => p.trip_id) || [];
+      if (tripIds.length === 0) return;
+      
+      const { data: vibeRooms } = await supabase.from('vibe_rooms').select('id, trip_id, trips(title, destination)').in('trip_id', tripIds);
+      if (vibeRooms && vibeRooms.length > 0) {
+        const mapped = vibeRooms.map((r: any) => ({
+          id: r.id,
+          name: r.trips?.title || 'Trip Room',
+          subtitle: r.trips?.destination || 'Vibe Room',
+          unread: 0,
+        }));
+        setRooms(mapped);
+        setActiveRoom(mapped[0].id);
+      }
+    };
+    fetchRooms();
+  }, [user]);
+
+  useEffect(() => {
+    if (activeRoom) {
+      loadMessages(activeRoom);
+      subscribeToRoom(activeRoom);
+      return () => unsubscribeFromRoom(activeRoom);
+    }
+  }, [activeRoom]);
+
+  const messages = useMemo(() => {
+    return (storeMessages[activeRoom] || []).map(m => ({
+      id: m.id,
+      sender: m.sender_profile?.name || 'Unknown',
+      text: m.content,
+      isMine: m.sender_id === user?.id
+    }));
+  }, [storeMessages, activeRoom, user]);
+
+  const activeRoomMeta = rooms.find((r) => r.id === activeRoom) || { name: 'Vibe Room', subtitle: '' };
   const visibleRooms = useMemo(
     () => roomQuery.trim()
       ? rooms.filter((room) => room.name.toLowerCase().includes(roomQuery.toLowerCase()))
@@ -92,43 +93,9 @@ export default function MessagesScreen() {
     [rooms, roomQuery]
   );
 
-  const appendToCurrentRoom = (text: string, sender = "You", isMine = true) => {
-    const newMessage: RoomMessage = {
-      id: `msg-${Date.now()}`,
-      sender,
-      text,
-      isMine,
-    };
-
-    setRoomMessages((prev) => ({
-      ...prev,
-      [activeRoom]: [...(prev[activeRoom] ?? []), newMessage],
-    }));
-
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
-  };
-
   const handleCreateRoom = () => {
-    const nextIndex = rooms.length + 1;
-    const roomId = `room-${Date.now()}`;
-    const newRoom: Room = {
-      id: roomId,
-      name: `Plan Room ${nextIndex}`,
-      subtitle: "Fresh coordination thread",
-      unread: 0,
-    };
-
-    setRooms((prev) => [...prev, newRoom]);
-    setRoomMessages((prev) => ({
-      ...prev,
-      [roomId]: [{
-        id: `intro-${Date.now()}`,
-        sender: "System",
-        text: "Room created. Start planning here.",
-      }],
-    }));
-    setActiveRoom(roomId);
-    setActionNote(`${newRoom.name} created`);
+    // Cannot create rooms arbitrarily since they are linked to trips
+    setActionNote("Rooms are created automatically with trips.");
   };
 
   const handleAttachAction = () => {
@@ -139,14 +106,14 @@ export default function MessagesScreen() {
         {
           text: "Location pin",
           onPress: () => {
-            appendToCurrentRoom("📍 Shared a pin: Temple entrance meeting point.", "You", true);
+            if (activeRoom) sendMessage(activeRoom, "📍 Shared a pin: Temple entrance meeting point.", "Text");
             setActionNote("Location pin added");
           },
         },
         {
           text: "Checklist",
           onPress: () => {
-            appendToCurrentRoom("✅ Checklist: Water, jacket, torch, cash.", "You", true);
+            if (activeRoom) sendMessage(activeRoom, "✅ Checklist: Water, jacket, torch, cash.", "Text");
             setActionNote("Checklist added");
           },
         },
@@ -157,10 +124,11 @@ export default function MessagesScreen() {
 
   const handleSend = () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || !activeRoom) return;
 
-    appendToCurrentRoom(text, "You", true);
+    sendMessage(activeRoom, text, "Text");
     setDraft("");
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
   return (

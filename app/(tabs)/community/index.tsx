@@ -24,6 +24,13 @@ import BottomTabBar from '../../../components/layouts/BottomTabBar';
 const { width } = Dimensions.get('window');
 const MATCHING_IDS = new Set(['amina', 'maha', 'tariq']);
 
+type MatchProfile = {
+  id: string;
+  name: string;
+  avatar: string;
+  matchPct?: number;
+};
+
 export default function CommunityScreen() {
   const router = useRouter();
   const auth = useAuthStore();

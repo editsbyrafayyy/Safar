@@ -1,0 +1,33 @@
+app/(tabs)/community/index.tsx(393,38): error TS7006: Parameter 'tag' implicitly has an 'any' type.
+app/(tabs)/journeys/[tripId]/expense.tsx(129,81): error TS2339: Property 'amount' does not exist on type 'Expense'.
+app/(tabs)/journeys/[tripId]/expense.tsx(135,59): error TS2339: Property 'your_balance' does not exist on type 'ExpenseLedger'.
+app/(tabs)/journeys/[tripId]/expense.tsx(135,147): error TS2339: Property 'your_balance' does not exist on type 'ExpenseLedger'.
+app/(tabs)/journeys/[tripId]/expense.tsx(146,61): error TS2339: Property 'total_amount' does not exist on type 'ExpenseLedger'.
+app/(tabs)/journeys/[tripId]/expense.tsx(175,30): error TS2538: Type 'null' cannot be used as an index type.
+app/(tabs)/journeys/[tripId]/expense.tsx(175,30): error TS2538: Type 'undefined' cannot be used as an index type.
+app/(tabs)/journeys/[tripId]/expense.tsx(181,48): error TS2339: Property 'description' does not exist on type 'Expense'.
+app/(tabs)/journeys/[tripId]/expense.tsx(182,66): error TS2339: Property 'created_at' does not exist on type 'Expense'.
+app/(tabs)/journeys/[tripId]/expense.tsx(185,54): error TS2339: Property 'amount' does not exist on type 'Expense'.
+app/(tabs)/journeys/[tripId]/expense.tsx(186,49): error TS2339: Property 'split_with' does not exist on type 'Expense'.
+app/(tabs)/journeys/[tripId]/expense.tsx(234,35): error TS2345: Argument of type 'string | null | undefined' is not assignable to parameter of type 'SetStateAction<string>'.
+  Type 'undefined' is not assignable to type 'SetStateAction<string>'.
+app/(tabs)/journeys/index.tsx(147,43): error TS2339: Property 'visaStack' does not exist on type '{ safe: { flex: number; backgroundColor: string; }; titleSection: { flexDirection: "row"; justifyContent: "space-between"; alignItems: "flex-end"; paddingHorizontal: number; paddingTop: number; paddingBottom: number; }; ... 86 more ...; addWishText: { ...; }; }'.
+app/(tabs)/journeys/index.tsx(155,65): error TS2339: Property 'visaMore' does not exist on type '{ safe: { flex: number; backgroundColor: string; }; titleSection: { flexDirection: "row"; justifyContent: "space-between"; alignItems: "flex-end"; paddingHorizontal: number; paddingTop: number; paddingBottom: number; }; ... 86 more ...; addWishText: { ...; }; }'.
+app/(tabs)/journeys/index.tsx(156,47): error TS2551: Property 'visaMoreText' does not exist on type '{ safe: { flex: number; backgroundColor: string; }; titleSection: { flexDirection: "row"; justifyContent: "space-between"; alignItems: "flex-end"; paddingHorizontal: number; paddingTop: number; paddingBottom: number; }; ... 86 more ...; addWishText: { ...; }; }'. Did you mean 'visaText'?
+app/(tabs)/journeys/index.tsx(300,63): error TS2339: Property 'note' does not exist on type '{ id: string; title: string; image: string; subtitle?: string | undefined; }'.
+app/(tabs)/profile/edit.tsx(25,11): error TS2339: Property 'name' does not exist on type 'ProfileState'.
+app/(tabs)/profile/edit.tsx(25,17): error TS2339: Property 'bio' does not exist on type 'ProfileState'.
+app/(tabs)/profile/edit.tsx(25,22): error TS2339: Property 'travelStyles' does not exist on type 'ProfileState'.
+app/(tabs)/profile/edit.tsx(25,36): error TS2339: Property 'languages' does not exist on type 'ProfileState'.
+app/(tabs)/profile/edit.tsx(53,9): error TS2353: Object literal may only specify known properties, and 'travelStyles' does not exist in type 'Partial<Profile>'.
+app/(tabs)/profile/index.tsx(70,33): error TS2339: Property 'followers_count' does not exist on type 'Profile'.
+backend/gateway/src/middleware/auth.ts(4,26): error TS2307: Cannot find module '../../shared/src/errors' or its corresponding type declarations.
+backend/gateway/src/middleware/errorHandler.ts(2,40): error TS2307: Cannot find module '../../shared/src/errors' or its corresponding type declarations.
+backend/gateway/src/middleware/errorHandler.ts(6,16): error TS18046: 'error' is of type 'unknown'.
+stores/profileStore.ts(47,26): error TS2345: Argument of type '(s: ProfileState) => { profile: { id?: string | undefined; email?: string | null | undefined; name?: string | null | undefined; bio?: string | null | undefined; membership_tier?: string | ... 1 more ... | undefined; profile_photo_url?: string | ... 1 more ... | undefined; }; ... 8 more ...; followerProfiles: Profile...' is not assignable to parameter of type 'ProfileState | Partial<ProfileState> | ((state: ProfileState) => ProfileState | Partial<ProfileState>)'.
+  Type '(s: ProfileState) => { profile: { id?: string | undefined; email?: string | null | undefined; name?: string | null | undefined; bio?: string | null | undefined; membership_tier?: string | ... 1 more ... | undefined; profile_photo_url?: string | ... 1 more ... | undefined; }; ... 8 more ...; followerProfiles: Profile...' is not assignable to type '(state: ProfileState) => ProfileState | Partial<ProfileState>'.
+    Type '{ profile: { id?: string | undefined; email?: string | null; name?: string | null; bio?: string | null; membership_tier?: string | null; profile_photo_url?: string | null; }; travelerProfile: TravelerProfile | null; ... 7 more ...; followerProfiles: Profile[]; }' is not assignable to type 'ProfileState | Partial<ProfileState>'.
+      Type '{ profile: { id?: string | undefined; email?: string | null; name?: string | null; bio?: string | null; membership_tier?: string | null; profile_photo_url?: string | null; }; travelerProfile: TravelerProfile | null; ... 7 more ...; followerProfiles: Profile[]; }' is not assignable to type 'Partial<ProfileState>'.
+        The types of 'profile.id' are incompatible between these types.
+          Type 'string | undefined' is not assignable to type 'string'.
+            Type 'undefined' is not assignable to type 'string'.
