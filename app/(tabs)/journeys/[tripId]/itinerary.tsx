@@ -1,22 +1,25 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Typography, Spacing, Radius } from "../../../../constants/Theme";
 import BottomTabBar from "../../../../components/layouts/BottomTabBar";
-
-const STOPS = [
-	{ day: 1, name: "Islamabad", note: "Departure point. Check gear, meet team." },
-	{ day: 2, name: "Chilas", note: "Night halt. Karakoram Highway begins." },
-	{ day: 3, name: "Skardu", note: "Base city. Rest and acclimatize." },
-	{ day: 5, name: "Askole", note: "Last village. Porter assembly." },
-	{ day: 8, name: "Concordia", note: "Throne Room of the Mountain Gods." },
-	{ day: 10, name: "K2 Base Camp", note: "Main objective. Altitude: 5,150m." },
-];
+import { useTripStore } from "../../../../stores/tripStore";
 
 export default function ItineraryScreen() {
 	const router = useRouter();
 	const { tripId } = useLocalSearchParams<{ tripId: string }>();
+	const { tripDetails, loadTripById } = useTripStore();
+	const trip = tripId && tripDetails[tripId as string];
+
+	useEffect(() => {
+		if (tripId) {
+			loadTripById(tripId as string);
+		}
+	}, [tripId]);
+
+	const stops = trip?.stops || [];
+	const tripData = trip?.trip;
 
 	return (
 		<SafeAreaView style={styles.safe}>
@@ -31,19 +34,21 @@ export default function ItineraryScreen() {
 			</View>
 
 			<ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-				<Text style={styles.tripTitle}>Karakoram Expedition</Text>
-				<Text style={styles.tripMeta}>14 Days  •  AUG 12 – AUG 28  •  Gilgit-Baltistan</Text>
+				<Text style={styles.tripTitle}>{tripData?.title || 'Trip'}</Text>
+				<Text style={styles.tripMeta}>
+					{stops.length} stops  •  {tripData?.start_date ? tripData.start_date.split('T')[0] : 'TBD'} – {tripData?.end_date ? tripData.end_date.split('T')[0] : 'TBD'}  •  {tripData?.destination || 'TBD'}
+				</Text>
 
-				{STOPS.map((stop, i) => (
+				{stops.map((stop, i) => (
 					<View key={i} style={styles.stopRow}>
 						<View style={styles.stopLeft}>
 							<View style={styles.stopDot} />
-							{i < STOPS.length - 1 && <View style={styles.stopLine} />}
+							{i < stops.length - 1 && <View style={styles.stopLine} />}
 						</View>
 						<View style={styles.stopBody}>
-							<Text style={styles.stopDay}>DAY {stop.day}</Text>
+							<Text style={styles.stopDay}>DAY {stop.sort_order || i + 1}</Text>
 							<Text style={styles.stopName}>{stop.name}</Text>
-							<Text style={styles.stopNote}>{stop.note}</Text>
+							<Text style={styles.stopNote}>{stop.description || 'No details available'}</Text>
 						</View>
 					</View>
 				))}

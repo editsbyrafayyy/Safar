@@ -22,24 +22,24 @@ Latest completed UI milestone: Entry 018 in `Build_Progress.md`.
 
 ## Phase 0 — Project Foundation (Start Here)
 
-- [ ] Initialize/verify Expo app config and scripts
-- [ ] Add TypeScript, Expo Router, Zustand, Supabase, AsyncStorage, NetInfo, Maps deps
-- [ ] Add environment variable template (`.env.example`)
-- [ ] Configure app shell layout and route groups
-- [ ] Set up design tokens in `constants/colors.ts`
-- [ ] Add global reusable layout/header scaffolding
-- [ ] Add strict lint/typecheck scripts
-- [ ] Smoke test app boot on simulator + Expo Go
+- [x] Initialize/verify Expo app config and scripts
+- [x] Add TypeScript, Expo Router, Zustand, Supabase, AsyncStorage, NetInfo, Maps deps
+- [x] Add environment variable template (`.env.example`)
+- [x] Configure app shell layout and route groups
+- [x] Set up design tokens in `constants/colors.ts`
+- [x] Add global reusable layout/header scaffolding
+- [x] Add strict lint/typecheck scripts
+- [x] Smoke test app boot on simulator + Expo Go
 
 ## Phase 1 — Data & Core Logic
 
 - [x] Implement `supabase/schema.sql` from PRD entities
-- [ ] Implement `supabase/seed.sql` with demo-safe seed data
+- [x] Implement `supabase/seed.sql` with demo-safe seed data
 - [x] Implement `lib/supabase.ts` client with env validation
-- [ ] Implement `lib/matchEngine.ts` using weighted scoring spec
-- [ ] Implement `lib/expenseCalc.ts` with split/balance settlement logic
-- [ ] Implement `lib/offlineStore.ts` cache wrappers with safe fallbacks
-- [ ] Unit test pure logic modules (`matchEngine`, `expenseCalc`)
+- [x] Implement `lib/matchEngine.ts` using weighted scoring spec
+- [x] Implement `lib/expenseCalc.ts` with split/balance settlement logic
+- [x] Implement `lib/offlineStore.ts` cache wrappers with safe fallbacks
+- [x] Unit test pure logic modules (`matchEngine`, `expenseCalc`)
 
 ## Phase 2 — Stores (State Layer)
 
@@ -150,6 +150,8 @@ Latest completed UI milestone: Entry 018 in `Build_Progress.md`.
 - [x] Stats card with icons (countries, expeditions, followers)
 - [x] Achievement badges horizontal scroll
 - [x] Followers preview with avatar stack
+- [x] Dedicated Followers list screen querying followers and profiles from Supabase
+
 - [x] Recent Journeys horizontal card scroll (from MOCK_TRIPS)
 - [x] Membership / verification CTA card
 - [x] Account preferences, security toggles, support sections — all with icon backgrounds + descriptions
@@ -159,6 +161,7 @@ Latest completed UI milestone: Entry 018 in `Build_Progress.md`.
 - [x] Swipe deck with gesture detection and card animation (F08)
 - [x] Match overlay with dismiss + keep exploring (F08)
 - [x] X = `triggerSwipeLeft()` (no alert), checkmark = Alert "Connected!" + swipeRight, star = Alert "Super Liked!" + swipeRight (Issue 6 fix)
+- [x] Insert backend records into Supabase `matches` table on swipe actions
 - [x] All `fontSize: scale(N)` replaced with `Typography.*` tokens in community/index.tsx and SwipeCard.tsx (Issue 6 fix)
 - [x] Raw hex colors in SwipeCard.tsx replaced with `Colors.*` tokens
 
@@ -168,6 +171,13 @@ Latest completed UI milestone: Entry 018 in `Build_Progress.md`.
 - Why it changed: Auth gate must always be the entry point; every screen must have a working escape route regardless of navigation history.
 - How verified: `npx tsc --noEmit` passes with only the pre-existing tsconfig ignoreDeprecations error (intentionally kept).
 - Core idea: Every feature that touches cross-screen state belongs in a Zustand store; everything else stays in component `useState`. Stubs must always be reachable and respond — never silently missing.
+174: 
+175: ## Latest Notes (2026-05-01)
+176: 
+177: - What changed: Fixed critical session persistence (AsyncStorage) and 400 login errors on web. Added root-level auto-loading for user profiles and trips to prevent "Traveler" UI flickering. Fixed hard crashes in Profile and Edit Profile screens (Hook ordering and Null safety).
+178: - Why it changed: Stability is a prerequisite for feature completion. Session restoration and robust UI error handling ensure the app feels reliable during development.
+179: - How verified: Verified via `npm run web` that refreshing stays logged in as "Ammar" and that "Edit Profile" no longer crashes.
+180: - Core idea: Centralize state restoration in the Root Layout and enforce defensive coding in forms to handle initial null states gracefully.
 
 ## Phase 6 — Offline & Reliability Hardening
 

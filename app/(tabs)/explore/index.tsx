@@ -11,6 +11,7 @@ import { Colors, Typography, Spacing, Radius, Shadow } from '../../../constants/
 import { MOCK_EXPLORE, ExploreJourney } from '../../../constants/mockData';
 import BottomTabBar from '../../../components/layouts/BottomTabBar';
 import { useTripStore } from '../../../stores/tripStore';
+import { useProfileStore } from '../../../stores/profileStore';
 
 type CategoryEntry = { headline: string; journeys: ExploreJourney[] };
 
@@ -114,31 +115,32 @@ export default function ExploreScreen() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const { featuredTrip, exploreJourneys, loadExploreContent, addToWishlist, removeFromWishlist, isWishlisted } = useTripStore();
+  const { nearbyTravelers, loadNearbyTravelers } = useProfileStore();
   const { featured, categories, journeys, vicinityTravelers } = MOCK_EXPLORE;
-  const [isFeaturedFallback, setIsFeaturedFallback] = useState(false);
-  const { addToWishlist, removeFromWishlist, isWishlisted } = useTripStore();
-  const featuredWishlistId = featured.title.toLowerCase().replace(/\s+/g, '-');
+
+  const featuredWishlistId = featuredTrip?.id ?? featured.title.toLowerCase().replace(/\s+/g, '-');
   const featuredSaved = isWishlisted(featuredWishlistId);
 
   const featuredFallbackUri = featured.fallbackImage ?? featured.image;
-  const featuredImageSource = useMemo(() => {
-    if (isFeaturedFallback && featuredFallbackUri) {
-      return featuredFallbackUri;
-    }
-    return featured.image;
-  }, [featured.image, featuredFallbackUri, isFeaturedFallback]);
-  const featuredHighlights = featured.highlights?.slice(0, 3) ?? [];
+  const featuredImageSource = featuredTrip?.hero_image_url ?? featured.image;
+  const featuredHighlights = featuredTrip?.destination ? [featuredTrip.destination] : featured.highlights?.slice(0, 3) ?? [];
 
-  const baseJourneys = CATEGORY_DATA[activeCategory]?.journeys ?? journeys;
+  const baseJourneys = exploreJourneys.length > 0 ? exploreJourneys : CATEGORY_DATA[activeCategory]?.journeys ?? journeys;
   const sectionHeadline = CATEGORY_DATA[activeCategory]?.headline ?? 'Curated Journeys';
   const filteredJourneys = searchQuery.trim()
-    ? baseJourneys.filter((j) => j.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? baseJourneys.filter((j: any) => (j.title || j.destination || '').toLowerCase().includes(searchQuery.toLowerCase()))
     : baseJourneys;
+
+  useEffect(() => {
+    loadExploreContent();
+    loadNearbyTravelers();
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 300);
     return () => clearTimeout(timer);
-  }, [activeCategory]);
+  }, [activeCategory, exploreJourneys]);
 
   const retry = () => {
     setHasError(false);
@@ -208,20 +210,18 @@ export default function ExploreScreen() {
             imageStyle={styles.featuredImgStyle}
             resizeMode="cover"
             onError={() => {
-              if (!isFeaturedFallback && featuredFallbackUri && featuredFallbackUri !== featured.image) {
-                setIsFeaturedFallback(true);
-              }
+              // fallback handled by featuredTrip check
             }}
           >
             <View style={styles.featuredOverlay}>
               <View style={styles.featuredTopRow}>
                 <View style={styles.trendingBadge}>
-                  <Text style={styles.trendingText}>{featured.badge}</Text>
-                  <Text style={styles.trendingRegion}>  {featured.region}</Text>
+                  <Text style={styles.trendingText}>{featuredTrip ? 'FEATURED' : featured.badge}</Text>
+                  <Text style={styles.trendingRegion}>  {featuredTrip?.destination ?? featured.region}</Text>
                 </View>
-                {featured.duration ? (
+                {featuredTrip?.status || featured.duration ? (
                   <View style={styles.featuredMeta}>
-                    <Text style={styles.featuredMetaText}>{featured.duration}</Text>
+                    <Text style={styles.featuredMetaText}>{featuredTrip?.status || featured.duration}</Text>
                   </View>
                 ) : null}
               </View>
@@ -234,8 +234,8 @@ export default function ExploreScreen() {
                   ))}
                 </View>
               ) : null}
-              <Text style={styles.featuredTitle}>{featured.title}</Text>
-              <Text style={styles.featuredDesc}>{featured.description}</Text>
+              <Text style={styles.featuredTitle}>{featuredTrip?.title ?? featured.title}</Text>
+              <Text style={styles.featuredDesc}>{featuredTrip?.destination ? `Experience the magic of ${featuredTrip.destination}` : featured.description}</Text>
               <View style={styles.featuredActions}>
                 <TouchableOpacity
                   style={styles.wishlistBtn}
@@ -245,10 +245,10 @@ export default function ExploreScreen() {
                       return;
                     }
                     addToWishlist({
-                      title: featured.title,
-                      subtitle: featured.region,
-                      image: featured.image,
-                      note: `Duration: ${featured.duration}`,
+                      title: featuredTrip?.title ?? featured.title,
+                      subtitle: featuredTrip?.destination ?? featured.region,
+                      image: featuredTrip?.hero_image_url ?? featured.image,
+                      note: `Status: ${featuredTrip?.status ?? 'Preparing'}`,
                     });
                   }}
                   accessibilityLabel={featuredSaved ? 'Remove from wishlist' : 'Save to wishlist'}
@@ -305,17 +305,17 @@ export default function ExploreScreen() {
         <TouchableOpacity
           style={styles.journeyCard}
           activeOpacity={0.88}
-          onPress={() => router.push('/(tabs)/explore/karakoram-chronicle' as never)}
+          onPress={() => router.push(`/(tabs)/journeys/${filteredJourneys[0].id}/itinerary` as never)}
         >
-          <Image source={{ uri: filteredJourneys[0].image }} style={styles.journeyImg} />
+          <Image source={{ uri: filteredJourneys[0].hero_image_url || filteredJourneys[0].image }} style={styles.journeyImg} />
           <View style={styles.journeyBody}>
             <View style={styles.journeyTitleRow}>
               <Text style={styles.journeyTitle}>{filteredJourneys[0].title}</Text>
               <View style={styles.matchCountBadge}>
-                <Text style={styles.matchCountText}>+{filteredJourneys[0].matchCount}</Text>
+                <Text style={styles.matchCountText}>+{(filteredJourneys[0] as any).matchCount || 0}</Text>
               </View>
             </View>
-            <Text style={styles.journeyDesc}>{filteredJourneys[0].description}</Text>
+            <Text style={styles.journeyDesc}>{filteredJourneys[0].description || `Explore ${filteredJourneys[0].destination}`}</Text>
             <View style={styles.journeyActions}>
               <TouchableOpacity
                 style={styles.journeyActionBtn}
@@ -357,14 +357,14 @@ export default function ExploreScreen() {
           onPress={() => router.push('/(tabs)/explore/desert-caravan-nights' as never)}
         >
           <ImageBackground
-            source={{ uri: filteredJourneys[1].image }}
+            source={{ uri: filteredJourneys[1].hero_image_url || filteredJourneys[1].image }}
             style={styles.fullImgBg}
             imageStyle={{ borderRadius: Radius.lg }}
           >
             <View style={styles.fullImgOverlay}>
               <Text style={styles.fullImgTitle}>{filteredJourneys[1].title}</Text>
-              {filteredJourneys[1].subtitle && (
-                <Text style={styles.fullImgSub}>{filteredJourneys[1].subtitle}</Text>
+              {filteredJourneys[1].destination && (
+                <Text style={styles.fullImgSub}>{filteredJourneys[1].destination}</Text>
               )}
             </View>
           </ImageBackground>
@@ -374,12 +374,12 @@ export default function ExploreScreen() {
 
         <Text style={styles.vicinityLabel}>TRAVELERS IN YOUR VICINITY</Text>
         <Animated.View entering={FadeInUp.delay(260).duration(280)} style={styles.vicinityRow}>
-          {vicinityTravelers.map((t) => (
+          {(nearbyTravelers.length > 0 ? nearbyTravelers.slice(0, 3) : vicinityTravelers).map((t: any) => (
             <TouchableOpacity key={t.id} style={styles.vicinityItem}
               onPress={() => router.push(`/traveler/${t.id}`)}>
-              <Image source={{ uri: t.avatar }} style={styles.vicinityAvatar} />
+              <Image source={{ uri: t.profile_photo_url || t.avatar || `https://i.pravatar.cc/150?u=${t.id}` }} style={styles.vicinityAvatar} />
               <Text style={styles.vicinityName}>{t.name}</Text>
-              <Text style={styles.vicinityLoc}>{t.location}</Text>
+              <Text style={styles.vicinityLoc}>{t.location || 'Pakistan'}</Text>
             </TouchableOpacity>
           ))}
         </Animated.View>

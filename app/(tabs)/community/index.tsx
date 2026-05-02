@@ -17,7 +17,8 @@ import {
 import { FontAwesome6, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Radius, Typography, scale, vscale } from '../../../constants/Theme';
-import { MOCK_MATCHES, MatchProfile } from '../../../constants/mockData';
+import { supabase } from '../../../lib/supabase';
+import { useAuthStore } from '../../../stores/authStore';
 import BottomTabBar from '../../../components/layouts/BottomTabBar';
 
 const { width } = Dimensions.get('window');
@@ -25,7 +26,8 @@ const MATCHING_IDS = new Set(['amina', 'maha', 'tariq']);
 
 export default function CommunityScreen() {
   const router = useRouter();
-  const deck = useMemo(() => MOCK_MATCHES, []);
+  const auth = useAuthStore();
+  const [deck, setDeck] = useState<any[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [matchProfile, setMatchProfile] = useState<MatchProfile | null>(null);
   const [animating, setAnimating] = useState(false);
@@ -39,6 +41,31 @@ export default function CommunityScreen() {
   useEffect(() => {
     slide.setValue(0);
   }, [activeIndex, slide]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const userId = auth.user?.id;
+        if (!userId) return;
+
+        // Fetch existing matches to exclude
+        const { data: matchesData } = await supabase
+          .from('matches')
+          .select('target_id')
+          .eq('requester_id', userId);
+        const swipedIds = new Set(matchesData?.map((m: any) => m.target_id) || []);
+
+        const { data } = await supabase.from('profiles').select(`id, name, profile_photo_url, bio, created_at`).order('created_at', { ascending: false });
+        // filter out current user and already swiped profiles
+        const others = (data ?? [])
+          .filter((p: any) => p.id !== userId && !swipedIds.has(p.id))
+          .map((p: any) => ({ id: p.id, name: p.name, avatar: p.profile_photo_url ?? null, bio: p.bio ?? '', tags: [] }));
+        setDeck(others);
+      } catch (e) {
+        console.warn('Failed to load community profiles', e);
+      }
+    })();
+  }, [auth.user]);
 
   useEffect(() => {
     if (!matchProfile) {
@@ -60,10 +87,42 @@ export default function CommunityScreen() {
     setActiveIndex(0);
   };
 
-  const finishAction = (profile: MatchProfile, direction: 'left' | 'right' | 'super') => {
+  const finishAction = async (profile: any, direction: 'left' | 'right' | 'super') => {
     setAnimating(false);
     setActiveIndex((prev) => prev + 1);
 
+    try {
+      const statusMap = {
+        left: 'Skipped',
+        right: 'Connected',
+        super: 'Connected' // SuperLiked isn't in the schema CHECK constraint
+      };
+      
+      const currentUserId = auth.user?.id;
+      if (currentUserId) {
+         // Check if already matched to prevent duplicates
+         const { data: existing } = await supabase
+            .from('matches')
+            .select('id')
+            .eq('requester_id', currentUserId)
+            .eq('target_id', profile.id)
+            .single();
+
+         if (!existing) {
+           const { error } = await supabase.from('matches').insert({
+              requester_id: currentUserId,
+              target_id: profile.id,
+              status: statusMap[direction]
+           });
+           if (error) console.warn('Failed to save match action:', error.message);
+         }
+      }
+    } catch (e) {
+      console.warn('Failed to save match action', e);
+    }
+
+    // For now, keep the random MATCHING_IDS check for demo purposes,
+    // or just assume a match if they swiped right.
     if (direction !== 'left' && MATCHING_IDS.has(profile.id)) {
       setMatchProfile(profile);
     }
@@ -163,63 +222,80 @@ export default function CommunityScreen() {
             {current ? (
               <Animated.View style={[styles.deckCard, styles.frontCard, currentStyle]}>
                 <Pressable style={styles.cardPressArea} onPress={() => setProfileOpen(true)}>
-                  <ImageBackground source={{ uri: current.avatar }} style={styles.cardImage} imageStyle={styles.cardImageRadius}>
-                    <View style={styles.cardTopBadge}>
-                      <Ionicons name="checkmark-circle" size={14} color={Colors.textOnDark} />
-                      <Text style={styles.cardTopBadgeText}>{current.matchPct}% match</Text>
-                    </View>
-
-                    <View style={styles.cardSideRail}>
-                      <IconBubble
-                        icon="xmark"
-                        backgroundColor={Colors.bgCard}
-                        color={Colors.danger}
-                        onPress={() => handleAction('left')}
-                      />
-                      <IconBubble
-                        icon="star"
-                        backgroundColor={Colors.brand}
-                        color={Colors.textOnDark}
-                        size={54}
-                        onPress={() => handleAction('super')}
-                      />
-                      <IconBubble
-                        icon="heart"
-                        backgroundColor={Colors.bgCard}
-                        color={Colors.brand}
-                        onPress={() => handleAction('right')}
-                      />
-                    </View>
-
-                    <View style={styles.cardOverlay}>
-                      <View style={styles.cardMetaRow}>
-                        <View style={styles.verifiedPill}>
-                          <Ionicons name="shield-checkmark" size={12} color={Colors.brand} />
-                          <Text style={styles.verifiedText}>Curated</Text>
-                        </View>
-                        <View style={styles.matchPill}>
-                          <Text style={styles.matchPillText}>{current.matchPct}% compatible</Text>
-                        </View>
+                  {current.avatar ? (
+                    <ImageBackground source={{ uri: current.avatar }} style={styles.cardImage} imageStyle={styles.cardImageRadius}>
+                      <View style={styles.cardTopBadge}>
+                        <Ionicons name="checkmark-circle" size={14} color={Colors.textOnDark} />
+                        <Text style={styles.cardTopBadgeText}>{current.matchPct ?? ''}% match</Text>
                       </View>
 
-                      <Text style={styles.cardName}>{current.name}</Text>
-                      <Text style={styles.cardLocation}>{current.age} · {current.location}</Text>
+                      <View style={styles.cardSideRail}>
+                        <IconBubble
+                          icon="xmark"
+                          backgroundColor={Colors.bgCard}
+                          color={Colors.danger}
+                          onPress={() => handleAction('left')}
+                        />
+                        <IconBubble
+                          icon="star"
+                          backgroundColor={Colors.brand}
+                          color={Colors.textOnDark}
+                          size={54}
+                          onPress={() => handleAction('super')}
+                        />
+                        <IconBubble
+                          icon="heart"
+                          backgroundColor={Colors.bgCard}
+                          color={Colors.brand}
+                          onPress={() => handleAction('right')}
+                        />
+                      </View>
 
-                      <View style={styles.tagRow}>
-                        {current.tags.map((tag) => (
-                          <View key={tag} style={styles.tagPill}>
-                            <Text style={styles.tagText}>{tag}</Text>
+                      <View style={styles.cardOverlay}>
+                        <View style={styles.cardMetaRow}>
+                          <View style={styles.verifiedPill}>
+                            <Ionicons name="shield-checkmark" size={12} color={Colors.brand} />
+                            <Text style={styles.verifiedText}>Curated</Text>
                           </View>
-                        ))}
+                          <View style={styles.matchPill}>
+                            <Text style={styles.matchPillText}>{current.matchPct ?? ''}% compatible</Text>
+                          </View>
+                        </View>
+
+                        <Text style={styles.cardName}>{current.name}</Text>
+                        <Text style={styles.cardLocation}>{/* age · location not available */}</Text>
+
+                        <View style={styles.tagRow}>
+                          {(current.tags || []).map((tag: string) => (
+                            <View key={tag} style={styles.tagPill}>
+                              <Text style={styles.tagText}>{tag}</Text>
+                            </View>
+                          ))}
+                        </View>
+
+                        <Text style={styles.cardBio} numberOfLines={3}>{current.bio}</Text>
+
+                        <TouchableOpacity style={styles.viewProfileBtn} onPress={() => setProfileOpen(true)}>
+                          <Text style={styles.viewProfileText}>View profile</Text>
+                        </TouchableOpacity>
                       </View>
-
-                      <Text style={styles.cardBio} numberOfLines={3}>{current.bio}</Text>
-
-                      <TouchableOpacity style={styles.viewProfileBtn} onPress={() => setProfileOpen(true)}>
-                        <Text style={styles.viewProfileText}>View profile</Text>
-                      </TouchableOpacity>
+                    </ImageBackground>
+                  ) : (
+                    <View style={[styles.cardImage, styles.cardImageRadius, { backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }]}> 
+                      <View style={styles.cardTopBadge}>
+                        <Ionicons name="checkmark-circle" size={14} color={Colors.textOnDark} />
+                        <Text style={styles.cardTopBadgeText}>{current.matchPct ?? ''}% match</Text>
+                      </View>
+                      <View style={styles.cardOverlay}>
+                        <Text style={styles.cardName}>{current.name}</Text>
+                        <Text style={styles.cardLocation}>{/* no location */}</Text>
+                        <Text style={styles.cardBio} numberOfLines={3}>{current.bio}</Text>
+                        <TouchableOpacity style={styles.viewProfileBtn} onPress={() => setProfileOpen(true)}>
+                          <Text style={styles.viewProfileText}>View profile</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  </ImageBackground>
+                  )}
                 </Pressable>
               </Animated.View>
             ) : (
@@ -266,7 +342,11 @@ export default function CommunityScreen() {
                 <Image source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80' }} style={styles.matchAvatar} />
               </View>
               <View style={[styles.matchAvatarWrap, styles.matchAvatarOverlap]}>
-                <Image source={{ uri: matchProfile.avatar }} style={styles.matchAvatar} />
+                {matchProfile.avatar ? (
+                  <Image source={{ uri: matchProfile.avatar }} style={styles.matchAvatar} />
+                ) : (
+                  <View style={[styles.matchAvatar, { backgroundColor: '#fff', borderWidth: 1, borderColor: Colors.border }]} />
+                )}
               </View>
             </View>
             <Text style={styles.matchCopy}>
@@ -284,9 +364,13 @@ export default function CommunityScreen() {
 
       <Modal visible={profileOpen} transparent animationType="fade" onRequestClose={() => setProfileOpen(false)}>
         <Pressable style={styles.profileOverlay} onPress={() => setProfileOpen(false)}>
-          {current ? (
+            {current ? (
             <Pressable style={styles.profileSheet} onPress={() => undefined}>
-              <Image source={{ uri: current.avatar }} style={styles.profileHero} resizeMode="cover" />
+              {current.avatar ? (
+                <Image source={{ uri: current.avatar }} style={styles.profileHero} resizeMode="cover" />
+              ) : (
+                <View style={[styles.profileHero, { backgroundColor: '#fff', borderWidth: 1, borderColor: Colors.border }]} />
+              )}
               <View style={styles.profileBody}>
                 <View style={styles.profileHeaderRow}>
                   <View style={{ flex: 1 }}>

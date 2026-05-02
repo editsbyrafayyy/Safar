@@ -311,7 +311,11 @@ function AccountRow({
   return (
     <View style={[styles.row, isLast && styles.rowLast]}>
       <View style={styles.rowIconWrap}>
-        <MaterialCommunityIcons name={icon} size={17} color={Colors.textPrimary} />
+        {icon === 'google' ? (
+          <Ionicons name="logo-google" size={18} color="#EA4335" />
+        ) : (
+          <MaterialCommunityIcons name={icon} size={17} color={Colors.textPrimary} />
+        )}
       </View>
       <View style={styles.rowTextStack}>
         <Text style={styles.rowTitle}>{name}</Text>

@@ -1,15 +1,51 @@
+import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { Platform, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Colors } from "@/constants/Theme";
-import "@/lib/supabase"; // <--- Added this to run the Supabase connection test
+import "@/lib/supabase"; // ensure supabase client initializes
+import { checkConnection } from "@/lib/supabase";
+import { useAuthStore } from "@/stores/authStore";
+import { useProfileStore } from "@/stores/profileStore";
+import { useTripStore } from "@/stores/tripStore";
 
 
 export default function RootLayout() {
+  const { checkSession, isAuthenticated, user } = useAuthStore();
+  const { loadCurrentProfile } = useProfileStore();
+  const { loadTripsForCurrentUser } = useTripStore();
+
+  useEffect(() => {
+    checkSession();
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      loadCurrentProfile();
+      loadTripsForCurrentUser();
+    }
+  }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await checkConnection();
+        if (res.ok) {
+          if ((res as any).warning) console.warn('Supabase reachable, but:', (res as any).warning);
+          else console.log('Supabase connected', (res as any).info);
+        } else {
+          console.error('Supabase not reachable:', (res as any).error);
+        }
+      } catch (e) {
+        console.error('Supabase check failed:', e);
+      }
+    })();
+  }, []);
+
   return (
     <GestureHandlerRootView style={styles.root}>
       <View style={styles.webBg}>
-        <View style={styles.mobileFrame}>
+          <View style={styles.mobileFrame}>
           <Stack screenOptions={{ headerShown: false }} />
         </View>
       </View>
@@ -36,5 +72,13 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: Platform.OS === "web" ? 1 : 0,
     borderColor: Colors.border,
+  },
+  debugWrap: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 50,
+    pointerEvents: 'none',
+    backgroundColor: 'transparent',
   },
 });

@@ -24,3 +24,16 @@ This document tracks the recent backend initialization and bug-fix changes made 
 
 ### 5. Documentation Updates
 - Updated `Implementation_Checklist.md` to officially mark Phase 1 tasks (`supabase/schema.sql` and `lib/supabase.ts` implementation) as **DONE [x]**.
+
+### 6. UI Polish & Data Hookups
+- Implemented real-time Supabase matching logic in `app/(tabs)/community/index.tsx`. Swipe actions (Connect, Super Like, Pass) now securely insert interaction records into the `matches` table.
+- Added graceful empty states for "Upcoming" and "Past Trips" in `app/(tabs)/journeys/index.tsx` to properly handle users with no active journeys, removing irrelevant "extend journey" mock cards.
+- Removed the placeholder stub screen for Followers and built a fully functional `app/(tabs)/profile/followers.tsx` screen that queries and lists the user's followers natively from the database.
+
+### 7. Stability & Persistence Pass
+- **Session Persistence:** Configured `AsyncStorage` in `lib/supabase.ts` (with web-safe `Platform.OS` check) to ensure users remain logged in after refreshing the browser or restarting the app.
+- **Auto-Loading Profile:** Added an initialization `useEffect` in `app/_layout.tsx` that detects an authenticated session and automatically triggers `loadCurrentProfile()` and `loadTripsForCurrentUser()`. This ensures that data like the user's name ("Ammar") is restored immediately without showing placeholder "Traveler" defaults.
+- **Community Refinement:** Fixed the `matches` table integration. Corrected column names to `requester_id`/`target_id`, mapped `SuperLiked` to the accepted `Connected` status, and added logic to filter out previously swiped profiles to prevent duplicates.
+- **UI Resilience:** Fixed several hard crashes:
+  - **Hook Ordering:** Corrected the Profile screen logic to keep hooks at the top, preventing the "Rendered fewer hooks than expected" error during loading states.
+  - **Null Safety:** Added defensive state initialization in the Edit Profile screen to handle null `bio` or `name` fields, preventing "Cannot read length of undefined" crashes.

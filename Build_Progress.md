@@ -1260,3 +1260,108 @@ Resolve messages-screen alignment issues and replace non-functional/same-destina
 
 ### Core Idea
 - Reduce cognitive load by making controls self-explanatory and immediately actionable where users already are.
+
+---
+
+## Entry 025 — 2026-05-01
+
+### Goal
+Implement Phase 1 core logic modules (Match Engine, Expense Calculator, Offline Store wrappers) and Supabase seed data.
+
+### Changes Made
+- Added `supabase/seed.sql` containing demo-safe seed data for agencies, users, traveler profiles, trips, and expenses to populate the backend database.
+- Implemented `lib/matchEngine.ts` with `computeMatchScore` and `cosineSimilarity` mathematical algorithms according to the weighted scoring spec (DNA similarity, travel style, pace, and interest tags).
+- Implemented `lib/expenseCalc.ts` with `calculateBalances` handling `Equal`, `Custom`, and `Payer-only` split methods, returning accurate group ledger balances.
+- Added `lib/offlineStore.ts` using `AsyncStorage` to provide typed fallback caching utilities.
+- Wrote and executed unit tests in a custom test script to verify math engine correctness.
+- Updated `Implementation_Checklist.md` to mark all Phase 1 tasks as complete.
+
+### Files Changed
+- `supabase/seed.sql`
+- `lib/matchEngine.ts`
+- `lib/expenseCalc.ts`
+- `lib/offlineStore.ts`
+- `scratch/testLogic.js`
+- `Implementation_Checklist.md`
+- `Build_Progress.md`
+
+### Verification
+- Ran math assertions locally via standard JS execution to ensure compatibility algorithms and split calculations produced correct PRD-expected outputs.
+
+### Reasoning
+- Safar's core differentiation relies on its AI matching and automated trip splitting. Building these pure logic modules independently ensures they can be tested without UI dependencies and cleanly hooked into the state layer in Phase 2.
+
+---
+
+## Entry 026 — 2026-05-01
+
+### Goal
+Fix session persistence, profile auto-loading on refresh, and correct database seed table names.
+
+### Changes Made
+- **Supabase Persistence:** Configured `lib/supabase.ts` to use `@react-native-async-storage/async-storage` for auth storage. This ensures the session persists across browser refreshes and app restarts.
+- **Auto-Profile Loading:** Updated `RootLayout` (`app/_layout.tsx`) to automatically call `loadCurrentProfile()` and `loadTripsForCurrentUser()` as soon as an authenticated session is detected. This prevents UI "flicker" or data loss upon refresh.
+- **Seed Data Fix:** Corrected `supabase/seed.sql` to use the `profiles` table name instead of the incorrect `users` table. This ensures seeded demo users actually have associated profile names and metadata.
+- **UI Fallbacks:** Added an `ActivityIndicator` to the Profile screen to handle loading states gracefully, preventing the user from seeing "Traveler" or "—" before their real data arrives.
+
+### Files Changed
+- `lib/supabase.ts`
+- `app/_layout.tsx`
+- `supabase/seed.sql`
+- `app/(tabs)/profile/index.tsx`
+- `Build_Progress.md`
+
+### Verification
+- Verified that store initialization logic triggers correctly on `isAuthenticated` change.
+- Confirmed `AsyncStorage` is correctly integrated into the Supabase client options.
+
+### Reasoning
+- React Native and Expo Web require explicit storage configuration for Supabase session persistence. Without it, the user is effectively "logged out" in state even if the browser has a cookie, leading to the reset behaviors observed.
+- Centralizing profile loading in the RootLayout ensures that all screens have access to user data immediately upon session restoration, rather than waiting for individual screen mounts.
+
+---
+
+## Entry 027 — 2026-05-01
+
+### Goal
+Fix "Rendered fewer hooks than expected" crash and resolve 400 Bad Request login error on web.
+
+### Changes Made
+- **Hooks Order Fix:** Moved all `useState` and `useEffect` hooks in `app/(tabs)/profile/index.tsx` above the conditional loading return. This ensures that the same number of hooks are rendered every time, preventing the React crash.
+- **Web Storage Compatibility:** Updated `lib/supabase.ts` to only use `AsyncStorage` when `Platform.OS !== 'web'`. On web, we now allow Supabase to default to `localStorage`. This resolves the 400 error the user was seeing during login on the web platform.
+
+### Files Changed
+- `app/(tabs)/profile/index.tsx`
+- `lib/supabase.ts`
+- `Build_Progress.md`
+
+### Verification
+- Verified that Profile screen now correctly transitions from loading to content without crashing.
+- Verified that login request payload on web no longer causes a 400 error by restoring standard web storage behavior.
+
+### Reasoning
+- React hooks must never be skipped by conditional returns. Moving them to the top is the standard fix for "Rendered fewer hooks than expected".
+- `AsyncStorage` on web is a secondary wrapper; Supabase's native `localStorage` handling is more robust for web-based auth flows and avoids payload conflicts that can lead to 400 Bad Request errors.
+
+---
+
+## Entry 028 — 2026-05-01
+
+### Goal
+Fix "Cannot read properties of undefined (reading 'length')" crash in Edit Profile screen.
+
+### Changes Made
+- **State Initialization Fix:** Updated `app/(tabs)/profile/edit.tsx` to provide default empty values (`''` and `[]`) when initializing state from the profile store. This prevents crashes when the user's name, bio, or styles are null in the database (common for new accounts).
+
+### Files Changed
+- `app/(tabs)/profile/edit.tsx`
+- `Build_Progress.md`
+
+### Verification
+- Confirmed that opening the Edit Profile screen no longer crashes even if profile data is missing.
+
+### Reasoning
+- React components must be resilient to null/undefined data from stores. By providing fallbacks at the state initialization level, we ensure that string methods like `.length` or `.trim()` can be called safely during the first render.
+
+### Core Idea
+- Defensive state initialization is key to building stable forms that handle both established and new user profiles.
