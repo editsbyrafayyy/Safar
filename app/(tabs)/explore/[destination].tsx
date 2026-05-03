@@ -34,7 +34,7 @@ export default function DestinationDetailScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => router.replace('/(tabs)/explore')}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={styles.backBtn}
             accessibilityLabel="Go back"
@@ -57,7 +57,7 @@ export default function DestinationDetailScreen() {
           <Image source={{ uri: dest.heroImage }} style={styles.heroImage} />
           <View style={styles.heroOverlay} />
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => router.replace('/(tabs)/explore')}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={styles.heroBackBtn}
             accessibilityLabel="Go back"

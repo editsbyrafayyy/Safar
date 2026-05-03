@@ -315,6 +315,7 @@ export const matchDNA: DNAProfile = {
 
 export const MOCK_EXPLORE = {
 	featured: {
+		id: "hunza-valley",
 		title: "Hunza Valley",
 		description: "Golden autumn corridors, glacier-fed lakes, and slow heritage trails.",
 		region: "NORTHERN PAKISTAN",
@@ -329,6 +330,7 @@ export const MOCK_EXPLORE = {
 	categories: ["MOUNTAINS", "HERITAGE", "DESERT", "LAKES", "CITY"],
 	journeys: [
 		{
+			id: "swat-valley",
 			title: "Karakoram Chronicle",
 			description: "High passes, glacier viewpoints, and curated lodge stops.",
 			image:
@@ -336,6 +338,7 @@ export const MOCK_EXPLORE = {
 			matchCount: 18,
 		},
 		{
+			id: "fairy-meadows",
 			title: "Desert Caravan Nights",
 			description: "Sandstone routes, stargazing camps, and craft bazaar detours.",
 			image:

@@ -115,7 +115,7 @@ export default function ExploreScreen() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const { featuredTrips, exploreJourneys, loadExploreContent, addToWishlist, removeFromWishlist, isWishlisted } = useTripStore();
+  const { featuredTrips, exploreJourneys, loadExploreContent, addToWishlist, removeFromWishlist, isWishlisted, joinTrip } = useTripStore();
   const { nearbyTravelers, loadNearbyTravelers } = useProfileStore();
   const { categories, journeys, vicinityTravelers } = MOCK_EXPLORE;
 
@@ -241,7 +241,12 @@ export default function ExploreScreen() {
                 <TouchableOpacity
                   style={[styles.featuredCard, { marginHorizontal: 0, width: 300 }]}
                   activeOpacity={0.9}
-                  onPress={() => router.push('/(tabs)/explore/hunza-valley' as never)}
+                  onPress={() => {
+                    const slug = (item.id === 'hunza-valley' || item.id === 'swat-valley' || item.id === 'fairy-meadows') 
+                      ? item.id 
+                      : (item.destination?.toLowerCase().replace(/\s+/g, '-') || 'hunza-valley');
+                    router.push(`/(tabs)/explore/${slug}` as never);
+                  }}
                 >
                   <ImageBackground
                     source={{ uri: imageUri }}
@@ -300,7 +305,13 @@ export default function ExploreScreen() {
                             color={isSaved ? Colors.danger : Colors.textMuted}
                           />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.joinBtn} onPress={() => router.push('/(tabs)/journeys/new-journey')}>
+                        <TouchableOpacity 
+                          style={styles.joinBtn} 
+                          onPress={async () => {
+                            await joinTrip(item.id);
+                            router.push(`/(tabs)/journeys/${item.id}/vibe-room` as never);
+                          }}
+                        >
                           <Text style={styles.joinText}>Join Expedition</Text>
                         </TouchableOpacity>
                       </View>
@@ -349,7 +360,13 @@ export default function ExploreScreen() {
         <TouchableOpacity
           style={styles.journeyCard}
           activeOpacity={0.88}
-          onPress={() => router.push(`/(tabs)/journeys/${(filteredJourneys[0] as any).id || '1'}/itinerary` as never)}
+          onPress={() => {
+            const item = filteredJourneys[0];
+            const slug = (item.id === 'hunza-valley' || item.id === 'swat-valley' || item.id === 'fairy-meadows') 
+              ? item.id 
+              : (item.destination?.toLowerCase().replace(/\s+/g, '-') || 'hunza-valley');
+            router.push(`/(tabs)/explore/${slug}` as never);
+          }}
         >
           <Image source={{ uri: (filteredJourneys[0] as any).hero_image_url || (filteredJourneys[0] as any).image }} style={styles.journeyImg} />
           <View style={styles.journeyBody}>
@@ -398,7 +415,13 @@ export default function ExploreScreen() {
         <TouchableOpacity
           style={styles.fullImgCard}
           activeOpacity={0.9}
-          onPress={() => router.push('/(tabs)/explore/desert-caravan-nights' as never)}
+          onPress={() => {
+            const item = filteredJourneys[1];
+            const slug = (item.id === 'hunza-valley' || item.id === 'swat-valley' || item.id === 'fairy-meadows') 
+              ? item.id 
+              : (item.destination?.toLowerCase().replace(/\s+/g, '-') || 'hunza-valley');
+            router.push(`/(tabs)/explore/${slug}` as never);
+          }}
         >
           <ImageBackground
             source={{ uri: (filteredJourneys[1] as any).hero_image_url || (filteredJourneys[1] as any).image }}

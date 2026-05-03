@@ -167,9 +167,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     let attempt = 0;
 
-    const connect = () => {
+    const connect = async () => {
+      const topic = `room:${roomId}`;
+      const existing = supabase.getChannels().find(c => c.topic === topic || c.topic === `realtime:${topic}`);
+      if (existing) {
+        await supabase.removeChannel(existing);
+      }
+
       const channel = supabase
-        .channel(`room:${roomId}`)
+        .channel(topic)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
@@ -211,7 +217,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               const delay = BACKOFF_DELAYS[attempt];
               attempt += 1;
               setTimeout(() => {
-                supabase.removeChannel(channel);
+                if (channel) supabase.removeChannel(channel);
                 connect();
               }, delay);
             }
@@ -228,8 +234,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   unsubscribeFromRoom: (roomId: string) => {
-    supabase.channel(`room:${roomId}`).unsubscribe();
-    supabase.removeChannel(supabase.channel(`room:${roomId}`));
+    const topic = `room:${roomId}`;
+    const existing = supabase.getChannels().find(c => c.topic === topic || c.topic === `realtime:${topic}`);
+    if (existing) {
+      supabase.removeChannel(existing);
+    }
     set((s) => {
       const updated = { ...s.activeSubscriptions };
       delete updated[roomId];

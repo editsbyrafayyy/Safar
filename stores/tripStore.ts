@@ -98,6 +98,8 @@ type TripState = {
   removeFromWishlist: (itemId: string) => void;
   isWishlisted: (itemId: string) => boolean;
   addTrip: (data: { title: string; destination: string; startDate: Date; endDate: Date }) => Promise<void>;
+  joinTrip: (tripId: string) => Promise<void>;
+  addItineraryStop: (tripId: string, name: string, description: string) => Promise<void>;
 };
 
 export const useTripStore = create<TripState>((set, get) => ({
@@ -148,12 +150,51 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
 
     if (trip) {
-      // Manually create an initial itinerary and vibe room if no triggers exist
-      await supabase.from('itineraries').insert({ trip_id: trip.id, duration_days: 7 });
-      await supabase.from('vibe_rooms').insert({ trip_id: trip.id, session_status: 'active' });
-      await supabase.from('trip_participants').insert({ trip_id: trip.id, user_id: user.id, role: 'owner' });
+      try {
+        // Manually create an initial itinerary, vibe room, and add participant
+        const results = await Promise.all([
+          supabase.from('itineraries').insert({ trip_id: trip.id, duration_days: 7 }),
+          supabase.from('vibe_rooms').insert({ trip_id: trip.id, session_status: 'active' }),
+          supabase.from('trip_participants').insert({ trip_id: trip.id, user_id: user.id, role: 'owner' })
+        ]);
+
+        const firstError = results.find(r => r.error);
+        if (firstError) {
+          console.error('Error creating secondary trip records:', firstError.error);
+          // We don't throw here to avoid failing the whole trip creation if just a participant entry failed,
+          // but we log it for debugging.
+        }
+      } catch (err) {
+        console.error('Failed to create secondary trip records:', err);
+      }
 
       await get().loadTripsForCurrentUser();
+    }
+  },
+
+  joinTrip: async (tripId: string) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+    
+    try {
+      // Ensure user is participant
+      const { error: partErr } = await supabase.from('trip_participants').upsert({
+        trip_id: tripId,
+        user_id: user.id,
+        role: 'member'
+      }, { onConflict: 'trip_id, user_id' });
+      if (partErr) console.error('Error adding participant:', partErr);
+      
+      // Ensure vibe room exists
+      const { error: vibeErr } = await supabase.from('vibe_rooms').upsert({
+        trip_id: tripId,
+        session_status: 'active'
+      }, { onConflict: 'trip_id' });
+      if (vibeErr) console.error('Error ensuring vibe room:', vibeErr);
+      
+      await get().loadTripsForCurrentUser();
+    } catch (err) {
+      console.error('Failed to join trip:', err);
     }
   },
 
@@ -280,6 +321,48 @@ export const useTripStore = create<TripState>((set, get) => ({
         loading: false 
       });
     } catch (e: any) {
+      set({ error: e?.message || String(e), loading: false });
+    }
+  },
+
+  addItineraryStop: async (tripId: string, name: string, description: string) => {
+    set({ loading: true, error: null });
+    try {
+      const details = get().tripDetails[tripId];
+      let itineraryId = details?.itinerary?.id;
+
+      // If no itinerary exists, create one
+      if (!itineraryId) {
+        const { data: newItinerary, error: itError } = await supabase
+          .from('itineraries')
+          .insert({ trip_id: tripId, duration_days: 1 })
+          .select()
+          .single();
+        
+        if (itError) throw itError;
+        itineraryId = newItinerary.id;
+      }
+
+      // Calculate next sort_order
+      const existingStops = details?.stops || [];
+      const nextOrder = existingStops.length + 1;
+
+      // Insert the new stop
+      const { error: stopError } = await supabase
+        .from('itinerary_stops')
+        .insert({
+          itinerary_id: itineraryId,
+          name,
+          description,
+          sort_order: nextOrder
+        });
+
+      if (stopError) throw stopError;
+
+      // Refresh trip details
+      await get().loadTripById(tripId);
+    } catch (e: any) {
+      console.error('Error adding stop:', e);
       set({ error: e?.message || String(e), loading: false });
     }
   },

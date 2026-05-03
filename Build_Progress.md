@@ -1509,3 +1509,115 @@ VibeRoom improvement pass — Batch 3 (All remaining items).
 - Photo/Location: stubs requiring `expo-image-picker` / `expo-location` install
 - Event creator: stub for next sprint
 - Long-press reaction picker: SQL migration exists, UI not yet built (next sprint)
+
+---
+
+## Entry 019 — 2026-05-03
+
+### Goal
+- Fix Vibe Room integration, enrollment logic, and navigation consistency across the app.
+
+### Changes Made
+- **Expedition Enrollment:**
+    - Added `joinTrip(tripId)` to `tripStore.ts` to link users to expeditions and ensure a `vibe_room` exists.
+    - Fixed the "Join Expedition" button in `app/(tabs)/explore/index.tsx` to call the joining logic and navigate to the chat room.
+    - Updated the database schema (`trip_participants`) to include the missing `role` column, resolving SQL insertion failures.
+- **Vibe Room Enhancements:**
+    - Refactored `vibe-room.tsx` to render dynamic data (trip title, itinerary duration, destination) instead of hardcoded fallbacks.
+    - Fixed a critical crash in `chatStore.ts` by correctly cleaning up stale Supabase Realtime channels before re-subscribing.
+- **Navigation UX:**
+    - Resolved history stack issues in the web variant where "Back" buttons would take users to the `new-journey` page.
+    - Screens like Followers, Itinerary, and Expense now use explicit `router.replace` paths to return to their parent tabs.
+
+### Files Changed
+- `stores/tripStore.ts`
+- `stores/chatStore.ts`
+- `app/(tabs)/explore/index.tsx`
+- `app/(tabs)/journeys/[tripId]/vibe-room.tsx`
+- `app/(tabs)/journeys/[tripId]/itinerary.tsx`
+- `app/(tabs)/journeys/[tripId]/expense.tsx`
+- `app/(tabs)/profile/followers.tsx`
+- `app/(tabs)/explore/[destination].tsx`
+- `changes_by_ammar.md`
+- `Implementation_Checklist2.md`
+
+### Verification
+- Verified via browser console that `postgres_changes` error no longer occurs on room entry.
+- Confirmed "Join Expedition" adds the user to the database and opens the correct Vibe Room.
+- Confirmed "Back" buttons on all updated screens now reliably return to the correct tab.
+
+### Reasoning
+- Explicit routing is necessary on the web variant of Expo Router to bypass browser history inconsistencies in tab-based layouts.
+- Dynamic data rendering in the Vibe Room was essential to fulfill the "Realtime Chat" PRD requirement and remove "mock" feel.
+
+### Core Idea
+- Navigation state should be predictable and context-aware. Database-backed features should ensure their dependencies (like room creation) are handled atomically during user actions.
+
+---
+
+## Entry 020 — 2026-05-03
+
+### Goal
+- Convert the static Itinerary view into an interactive Itinerary Builder.
+
+### Changes Made
+- **Store Logic:**
+    - Implemented `addItineraryStop` in `tripStore.ts`.
+    - Added logic to automatically create an `itineraries` record if one doesn't exist for the trip.
+    - Automated `sort_order` calculation and database persistence.
+- **UI Components:**
+    - Added an "Add Stop" dashed button to the `itinerary.tsx` screen.
+    - Built a custom `Modal` form for capturing stop names and descriptions.
+    - Implemented form validation, loading states, and automatic list refreshing.
+
+### Files Changed
+- `stores/tripStore.ts`
+- `app/(tabs)/journeys/[tripId]/itinerary.tsx`
+- `Build_Progress.md`
+- `Implementation_Checklist.md`
+- `changes_by_ammar.md`
+- `next_steps.md`
+
+### Verification
+- Verified on web variant that adding a stop correctly inserts into Supabase.
+- Confirmed the UI updates immediately after submission without manual refresh.
+
+### Reasoning
+- Centralizing the stop logic in the store ensures that data remains consistent and re-renders are triggered correctly across the app.
+- Modal-based input is chosen to maintain context within the timeline view without forcing complex navigation stacks.
+
+### Core Idea
+- Transform read-only data into editable structures while maintaining backend synchronization and optimistic-like UI updates.
+
+---
+
+## Entry 021 — 2026-05-03
+
+### Goal
+- Fix navigation hardcoding and wishlist reactivity issues in the Explore screen.
+
+### Changes Made
+- **Data Integrity:**
+    - Assigned unique IDs to `MOCK_EXPLORE` featured items and journeys in `constants/mockData.ts`. This ensures the wishlist store can track items correctly by ID.
+- **Dynamic Routing:**
+    - Refactored `app/(tabs)/explore/index.tsx` to remove hardcoded redirects (e.g., Hunza Valley).
+    - Implemented a dynamic slugifier that maps trip/destination IDs to their respective detail pages.
+- **Wishlist UI Fix:**
+    - Ensured the heart icon correctly reflects the `isSaved` state from the trip store by using the newly assigned unique IDs.
+
+### Files Changed
+- `constants/mockData.ts`
+- `app/(tabs)/explore/index.tsx`
+- `Build_Progress.md`
+- `changes_by_ammar.md`
+
+### Verification
+- Verified that clicking "Lahore" or "Hunza" correctly navigates to the intended destination page.
+- Confirmed the heart icon toggles between grey and red correctly and persists across screen reloads.
+
+### Reasoning
+- Robust state management depends on unique identifiers. Mock data without IDs leads to undefined behavior in globally shared stores (like Wishlist).
+- Dynamic routing is essential for a scalable "Explore" experience where new content can be added without modifying navigation logic.
+
+### Core Idea
+- Fix foundational data issues (missing IDs) to restore expected UI behavior and replace static navigation with dynamic logic.

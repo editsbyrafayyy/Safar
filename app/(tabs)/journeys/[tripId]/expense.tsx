@@ -103,7 +103,7 @@ export default function ExpenseScreen() {
 		<SafeAreaView style={styles.safe}>
 			<OfflineBanner />
 			<View style={styles.header}>
-				<TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+				<TouchableOpacity onPress={() => router.replace('/(tabs)/journeys')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
 					<Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
 				</TouchableOpacity>
 				<View style={styles.headerTitle}>

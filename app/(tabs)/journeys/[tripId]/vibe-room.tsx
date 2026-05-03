@@ -166,9 +166,11 @@ export default function VibeRoomScreen() {
 						<Text style={styles.pinnedLabel}>PINNED ITINERARY</Text>
 					</View>
 					<View style={styles.pinnedBody}>
-						<View>
-							<Text style={styles.pinnedTitle}>Karakoram Expedition</Text>
-							<Text style={styles.pinnedMeta}>14 Days • High Altitude</Text>
+						<View style={{ flex: 1, paddingRight: 12 }}>
+							<Text style={styles.pinnedTitle} numberOfLines={1}>{trip?.trip?.title || 'Expedition'}</Text>
+							<Text style={styles.pinnedMeta}>
+								{trip?.itinerary?.duration_days ? `${trip.itinerary.duration_days} Days` : 'Upcoming'} • {trip?.trip?.destination || 'Pakistan'}
+							</Text>
 						</View>
 						<TouchableOpacity onPress={() => router.push('/flows/vibe-map')}>
 							<Text style={styles.viewMapText}>VIEW MAP</Text>
@@ -191,10 +193,10 @@ export default function VibeRoomScreen() {
 					{briefExpanded && (
 						<View style={styles.briefGrid}>
 							{[
-								{ icon: "thermometer-outline" as const, label: "TEMP", val: "4°C" },
+								{ icon: "thermometer-outline" as const, label: "TEMP", val: "18°C" },
 								{ icon: "sunny-outline" as const, label: "SUNSET", val: "6:42 PM" },
-								{ icon: "location-outline" as const, label: "NEXT STOP", val: "Eagle Nest" },
-								{ icon: "time-outline" as const, label: "DAYS LEFT", val: "5 days" },
+								{ icon: "location-outline" as const, label: "NEXT STOP", val: trip?.stops?.[0]?.name || trip?.trip?.destination?.split(',')[0] || "Destination" },
+								{ icon: "time-outline" as const, label: "DAYS LEFT", val: trip?.itinerary?.duration_days ? `${trip.itinerary.duration_days} days` : "TBD" },
 							].map((item) => (
 								<View key={item.label} style={styles.briefStat}>
 									<Ionicons name={item.icon} size={14} color={Colors.textSecondary} />

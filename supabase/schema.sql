@@ -55,6 +55,7 @@ create table trips (
 create table trip_participants (
   trip_id uuid references trips(id) on delete cascade,
   user_id uuid references profiles(id) on delete cascade,
+  role text default 'member' check (role in ('owner', 'planner', 'member', 'viewer')),
   primary key (trip_id, user_id)
 );
 

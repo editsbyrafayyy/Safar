@@ -102,7 +102,7 @@ Latest completed UI milestone: Entry 018 in `Build_Progress.md`.
 - [x] Latest Update card: overlapping avatar stack + Notify All / View All action buttons
 - [x] Trips collection with cached labels
 - [x] Itinerary timeline view with links to Expense + Vibe Room (F16)
-- [ ] Itinerary builder: add/edit stops (F13 — currently read-only)
+- [x] Itinerary builder: add/edit stops (F13)
 
 ### 5E Vibe Room (Realtime)
 - [x] Room message fetch/send via Supabase

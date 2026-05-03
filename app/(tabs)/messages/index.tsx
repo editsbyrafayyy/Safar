@@ -15,6 +15,7 @@ import BottomTabBar from "@/components/layouts/BottomTabBar";
 import { Colors, Spacing, Radius, Typography } from "@/constants/Theme";
 import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
+import { useTripStore } from "@/stores/tripStore";
 import { supabase } from "@/lib/supabase";
 import { useEffect } from "react";
 
@@ -38,6 +39,7 @@ export default function MessagesScreen() {
   const [rooms, setRooms] = useState<any[]>([]);
   const [activeRoom, setActiveRoom] = useState<string>("");
   const { user } = useAuthStore();
+  const { trips } = useTripStore();
   const { messages: storeMessages, loadMessages, sendMessage, subscribeToRoom, unsubscribeFromRoom } = useChatStore();
 
   const [draft, setDraft] = useState("");
@@ -51,7 +53,10 @@ export default function MessagesScreen() {
     const fetchRooms = async () => {
       const { data: partData } = await supabase.from('trip_participants').select('trip_id').eq('user_id', user.id);
       const tripIds = partData?.map((p: any) => p.trip_id) || [];
-      if (tripIds.length === 0) return;
+      if (tripIds.length === 0) {
+        setRooms([]);
+        return;
+      }
       
       const { data: vibeRooms } = await supabase.from('vibe_rooms').select('id, trip_id, trips(title, destination)').in('trip_id', tripIds);
       if (vibeRooms && vibeRooms.length > 0) {
@@ -62,11 +67,17 @@ export default function MessagesScreen() {
           unread: 0,
         }));
         setRooms(mapped);
-        setActiveRoom(mapped[0].id);
+        
+        // Only set active room if none selected or current one no longer exists
+        if (!activeRoom || !mapped.find(r => r.id === activeRoom)) {
+          setActiveRoom(mapped[0].id);
+        }
+      } else {
+        setRooms([]);
       }
     };
     fetchRooms();
-  }, [user]);
+  }, [user, trips]);
 
   useEffect(() => {
     if (activeRoom) {

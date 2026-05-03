@@ -37,3 +37,20 @@ This document tracks the recent backend initialization and bug-fix changes made 
 - **UI Resilience:** Fixed several hard crashes:
   - **Hook Ordering:** Corrected the Profile screen logic to keep hooks at the top, preventing the "Rendered fewer hooks than expected" error during loading states.
   - **Null Safety:** Added defensive state initialization in the Edit Profile screen to handle null `bio` or `name` fields, preventing "Cannot read length of undefined" crashes.
+
+### 8. Vibe Room & Expedition Integration
+- **Joining Expeditions:** Fixed the "Join Expedition" flow in `app/(tabs)/explore/index.tsx`. It now calls a new `joinTrip` action in `tripStore.ts` which inserts the user into `trip_participants` and ensures a Vibe Room exists.
+- **Schema Update:** Identified and fixed a missing `role` column in the `trip_participants` table, which was preventing participant enrollment.
+- **Dynamic Content:** Refactored the Vibe Room UI to remove all hardcoded fallback data (like "Karakoram Expedition"). It now dynamically renders the actual trip title, destination, and itinerary duration from the database.
+- **Realtime Chat Fix:** Resolved a critical crash (`cannot add postgres_changes callbacks after subscribe`) in `chatStore.ts` by ensuring old channels are properly cleaned up using `supabase.getChannels()` before re-subscribing.
+- **Navigation UX:** Fixed a recurring routing bug where back buttons (Followers, Itinerary, Expense) would take users to the `new-journey` page. All sub-screens now use explicit `router.replace` paths to return to their parent tabs safely.
+
+### 9. Itinerary Builder Implementation
+- **Interactive Itinerary:** Upgraded the itinerary view to allow dynamic stop creation. 
+- **Database Wiring:** Integrated `itinerary_stops` persistence. The app now handles automatic itinerary record generation and sequential `sort_order` management.
+- **UI/UX:** Added a dashed "+ Add Stop" button and a bottom-sheet style `Modal` for data entry, including validation and real-time refreshing.
+
+### 10. Explore Screen Polish & Fixes
+- **Dynamic Navigation:** Removed hardcoded redirects to Hunza Valley. Clicking any featured escape now correctly maps to its respective destination page using a dynamic slugifier.
+- **Data Integrity Fix:** Assigned unique IDs to all items in `MOCK_EXPLORE`. This resolved a bug where the wishlist "heart" icon wouldn't turn red due to missing identifiers.
+- **State Reactivity:** Verified that the heart icon now correctly reflects the saved/unsaved status from the `tripStore` in real-time.
