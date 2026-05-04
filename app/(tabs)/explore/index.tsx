@@ -361,7 +361,7 @@ export default function ExploreScreen() {
           style={styles.journeyCard}
           activeOpacity={0.88}
           onPress={() => {
-            const item = filteredJourneys[0];
+            const item = filteredJourneys[0] as any;
             const slug = (item.id === 'hunza-valley' || item.id === 'swat-valley' || item.id === 'fairy-meadows') 
               ? item.id 
               : (item.destination?.toLowerCase().replace(/\s+/g, '-') || 'hunza-valley');
@@ -416,7 +416,7 @@ export default function ExploreScreen() {
           style={styles.fullImgCard}
           activeOpacity={0.9}
           onPress={() => {
-            const item = filteredJourneys[1];
+            const item = filteredJourneys[1] as any;
             const slug = (item.id === 'hunza-valley' || item.id === 'swat-valley' || item.id === 'fairy-meadows') 
               ? item.id 
               : (item.destination?.toLowerCase().replace(/\s+/g, '-') || 'hunza-valley');

@@ -390,7 +390,7 @@ export default function CommunityScreen() {
                 </View>
                 <Text style={styles.profileBio}>{current.bio}</Text>
                 <View style={styles.profileTagRow}>
-                  {current.tags.map((tag) => (
+                  {(current.tags as string[]).map((tag: string) => (
                     <View key={tag} style={styles.profileTagPill}>
                       <Text style={styles.profileTagText}>{tag}</Text>
                     </View>

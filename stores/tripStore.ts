@@ -1,6 +1,10 @@
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from './authStore';
+
+const EXPENSE_QUEUE_KEY = 'safar:expense_queue';
 
 export type NewTrip = {
   id: string;
@@ -73,9 +77,20 @@ export type Expense = {
   expense_date?: string | null;
 };
 
+type QueuedExpense = {
+  ledgerId: string;
+  tripId: string;
+  amount_pkr: number;
+  category: string;
+  split_method: string;
+  paid_by_user_id: string;
+  expense_date: string;
+  tempId: string;
+};
+
 type TripState = {
   trips: NewTrip[];
-  wishlist: Array<{ id: string; title: string; image: string; subtitle?: string }>;
+  wishlist: Array<{ id: string; title: string; image: string; subtitle?: string; note?: string }>;
   loading: boolean;
   error?: string | null;
   tripDetails: Record<string, {
@@ -90,6 +105,7 @@ type TripState = {
   }>;
   featuredTrips: NewTrip[];
   exploreJourneys: NewTrip[];
+  expenseQueue: QueuedExpense[];
   loadTripsForCurrentUser: () => Promise<void>;
   loadTripById: (tripId: string) => Promise<void>;
   loadExploreContent: () => Promise<void>;
@@ -100,6 +116,9 @@ type TripState = {
   addTrip: (data: { title: string; destination: string; startDate: Date; endDate: Date }) => Promise<void>;
   joinTrip: (tripId: string) => Promise<void>;
   addItineraryStop: (tripId: string, name: string, description: string) => Promise<void>;
+  addExpense: (tripId: string, ledgerId: string, expense: { amount_pkr: number; category: string; split_method: string; paid_by_user_id: string }) => Promise<void>;
+  flushExpenseQueue: () => Promise<void>;
+  initOfflineSync: () => void;
 };
 
 export const useTripStore = create<TripState>((set, get) => ({
@@ -110,6 +129,27 @@ export const useTripStore = create<TripState>((set, get) => ({
   tripDetails: {},
   featuredTrips: [],
   exploreJourneys: [],
+  expenseQueue: [],
+
+  initOfflineSync: () => {
+    // Restore persisted expense queue
+    AsyncStorage.getItem(EXPENSE_QUEUE_KEY).then((raw) => {
+      if (raw) {
+        try {
+          const saved: QueuedExpense[] = JSON.parse(raw);
+          if (saved.length > 0) set({ expenseQueue: saved });
+        } catch (_) {}
+      }
+    });
+
+    // Auto-flush on reconnect
+    NetInfo.addEventListener((state) => {
+      if (state.isConnected) {
+        const { expenseQueue, flushExpenseQueue } = useTripStore.getState();
+        if (expenseQueue.length > 0) flushExpenseQueue();
+      }
+    });
+  },
 
   addToWishlist: (item) => {
     set((s) => {
@@ -364,6 +404,93 @@ export const useTripStore = create<TripState>((set, get) => ({
     } catch (e: any) {
       console.error('Error adding stop:', e);
       set({ error: e?.message || String(e), loading: false });
+    }
+  },
+
+  addExpense: async (tripId, ledgerId, expense) => {
+    const tempId = `exp-temp-${Date.now()}`;
+    const newExpense: Expense = {
+      id: tempId,
+      ledger_id: ledgerId,
+      ...expense,
+      expense_date: new Date().toISOString(),
+    };
+
+    // Optimistic update
+    set((s) => {
+      const details = s.tripDetails[tripId];
+      if (!details) return s;
+      return {
+        tripDetails: {
+          ...s.tripDetails,
+          [tripId]: {
+            ...details,
+            expenses: [...details.expenses, newExpense],
+          },
+        },
+      };
+    });
+
+    // Check connectivity
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) {
+      const queuedItem: QueuedExpense = {
+        ledgerId,
+        tripId,
+        tempId,
+        ...expense,
+        expense_date: new Date().toISOString(),
+      };
+      const updatedQueue = [...get().expenseQueue, queuedItem];
+      set({ expenseQueue: updatedQueue });
+      try {
+        await AsyncStorage.setItem(EXPENSE_QUEUE_KEY, JSON.stringify(updatedQueue));
+      } catch (e) {
+        console.warn('Failed to persist expense queue:', e);
+      }
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('expenses').insert({
+        ledger_id: ledgerId,
+        ...expense,
+        expense_date: new Date().toISOString(),
+      });
+      if (error) throw error;
+      // Refresh to get server-assigned ID
+      await get().loadTripById(tripId);
+    } catch (e: any) {
+      console.error('Error adding expense:', e);
+      set({ error: e?.message || String(e) });
+    }
+  },
+
+  flushExpenseQueue: async () => {
+    const { expenseQueue } = get();
+    if (expenseQueue.length === 0) return;
+    const pending = [...expenseQueue];
+    set({ expenseQueue: [] });
+    try {
+      await AsyncStorage.removeItem(EXPENSE_QUEUE_KEY);
+    } catch (e) {
+      console.warn('Failed to clear expense queue:', e);
+    }
+    for (const item of pending) {
+      const { ledgerId, tripId, amount_pkr, category, split_method, paid_by_user_id, expense_date } = item;
+      try {
+        await supabase.from('expenses').insert({
+          ledger_id: ledgerId,
+          amount_pkr,
+          category,
+          split_method,
+          paid_by_user_id,
+          expense_date,
+        });
+        await get().loadTripById(tripId);
+      } catch (e) {
+        console.error('Failed to flush queued expense:', e);
+      }
     }
   },
 }));

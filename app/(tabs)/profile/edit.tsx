@@ -22,11 +22,11 @@ const ALL_LANGUAGES = ['English', 'Urdu', 'Punjabi', 'Pashto', 'Arabic', 'French
 
 export default function EditProfileScreen() {
   const router = useRouter();
-  const { name, bio, travelStyles, languages, setProfile } = useProfileStore();
-  const [localName, setLocalName] = useState(name || '');
-  const [localBio, setLocalBio] = useState(bio || '');
-  const [selectedStyles, setSelectedStyles] = useState<string[]>(travelStyles || []);
-  const [selectedLangs, setSelectedLangs] = useState<string[]>(languages || []);
+  const { profile, setProfile } = useProfileStore();
+  const [localName, setLocalName] = useState(profile?.name || '');
+  const [localBio, setLocalBio] = useState(profile?.bio || '');
+  const [selectedStyles, setSelectedStyles] = useState<string[]>(profile?.travelStyles || []);
+  const [selectedLangs, setSelectedLangs] = useState<string[]>(profile?.languages || []);
   const [nameError, setNameError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [saved, setSaved] = useState(false);

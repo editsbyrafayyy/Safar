@@ -144,7 +144,7 @@ export default function JourneysScreen() {
                     <Text style={styles.visaLabel}>LATEST UPDATE</Text>
                     <Text style={styles.visaText}>Trip preparation in progress. Check permits and documentation.</Text>
                     <View style={styles.visaFooter}>
-                      <View style={styles.visaStack}>
+                      <View style={styles.visaAvatarStack}>
                         {latestUpdateAvatars.map((url: string, i: number) => (
                           <Image
                             key={url + i}
@@ -399,6 +399,12 @@ const styles = StyleSheet.create({
   visaText: { ...Typography.h4, color: Colors.textPrimary, marginBottom: 14, lineHeight: 26 },
   visaFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   visaAvatarStack: { flexDirection: "row", alignItems: "center" },
+  visaMore: {
+    backgroundColor: Colors.bgMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  visaMoreText: { ...Typography.caption, color: Colors.textSecondary, fontSize: 9 },
   visaAvatar: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: Colors.bgCard },
   visaCountPill: { marginLeft: 8 },
   visaCountText: { ...Typography.caption, color: Colors.textMuted },

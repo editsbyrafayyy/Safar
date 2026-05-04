@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { Animated } from 'react-native';
 import {
   ActivityIndicator,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,35 +16,55 @@ import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow, Spacing, Typography, scale, vscale } from '../../constants/Theme';
 import { useAuthStore } from '../../stores/authStore';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 type Role = 'traveler' | 'agency';
 
-type TravelerFields = { name: string; email: string; password: string; confirm: string };
+type TravelerFields = { name: string; email: string; phone: string; password: string; confirm: string };
 type AgencyFields = {
   agencyName: string;
   contactPerson: string;
   email: string;
-  password: string;
+  phone: string;
   dtsLicense: string;
-  bankCert: string;
-  officeAddress: string;
+  password: string;
 };
 type FieldErrors = Partial<Record<string, string>>;
 
-function validate(role: Role, t: TravelerFields, a: AgencyFields): FieldErrors {
-  const errors: FieldErrors = {};
-  if (role === 'traveler') {
-    if (!t.name.trim()) errors.name = 'Full name is required.';
-    if (!t.email.trim() || !t.email.includes('@')) errors.email = 'Valid email is required.';
-    if (t.password.length < 8) errors.password = 'Password must be at least 8 characters.';
-    if (t.password !== t.confirm) errors.confirm = 'Passwords do not match.';
-  } else {
-    if (!a.agencyName.trim()) errors.agencyName = 'Agency name is required.';
-    if (!a.contactPerson.trim()) errors.contactPerson = 'Contact person name is required.';
-    if (!a.email.trim() || !a.email.includes('@')) errors.email = 'Valid email is required.';
-    if (a.password.length < 8) errors.password = 'Password must be at least 8 characters.';
-    if (!a.officeAddress.trim()) errors.officeAddress = 'Office address is required.';
-  }
-  return errors;
+function validateTraveler(t: TravelerFields): FieldErrors {
+  const e: FieldErrors = {};
+  if (!t.name.trim()) e.name = 'Full name is required.';
+  if (!EMAIL_RE.test(t.email.trim())) e.email = 'Enter a valid email address.';
+  if (t.password.length < 8) e.password = 'Password must be at least 8 characters.';
+  if (t.password !== t.confirm) e.confirm = 'Passwords do not match.';
+  return e;
+}
+
+function validateAgency(a: AgencyFields): FieldErrors {
+  const e: FieldErrors = {};
+  if (!a.agencyName.trim()) e.agencyName = 'Agency name is required.';
+  if (!a.contactPerson.trim()) e.contactPerson = 'Contact person is required.';
+  if (!EMAIL_RE.test(a.email.trim())) e.email = 'Enter a valid email address.';
+  if (a.password.length < 8) e.password = 'Password must be at least 8 characters.';
+  return e;
+}
+
+function canTravelerSubmit(t: TravelerFields): boolean {
+  return (
+    t.name.trim().length > 0 &&
+    EMAIL_RE.test(t.email.trim()) &&
+    t.password.length >= 8 &&
+    t.password === t.confirm
+  );
+}
+
+function canAgencySubmit(a: AgencyFields): boolean {
+  return (
+    a.agencyName.trim().length > 0 &&
+    a.contactPerson.trim().length > 0 &&
+    EMAIL_RE.test(a.email.trim()) &&
+    a.password.length >= 8
+  );
 }
 
 export default function RegisterScreen() {
@@ -57,15 +77,22 @@ export default function RegisterScreen() {
   const [showCreated, setShowCreated] = useState(false);
   const createdAnim = useRef(new Animated.Value(0)).current;
 
-  const [tFields, setTFields] = useState<TravelerFields>({ name: '', email: '', password: '', confirm: '' });
+  const [tFields, setTFields] = useState<TravelerFields>({
+    name: '', email: '', phone: '', password: '', confirm: '',
+  });
   const [aFields, setAFields] = useState<AgencyFields>({
-    agencyName: '', contactPerson: '', email: '', password: '',
-    dtsLicense: '', bankCert: '', officeAddress: '',
+    agencyName: '', contactPerson: '', email: '', phone: '', dtsLicense: '', password: '',
   });
 
   const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
   const passRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
+  const aEmailRef = useRef<TextInput>(null);
+  const aPhoneRef = useRef<TextInput>(null);
+  const aPassRef = useRef<TextInput>(null);
+
+  const canSubmit = role === 'traveler' ? canTravelerSubmit(tFields) : canAgencySubmit(aFields);
 
   const updateT = (key: keyof TravelerFields, val: string) => {
     setTFields((prev) => ({ ...prev, [key]: val }));
@@ -76,26 +103,39 @@ export default function RegisterScreen() {
     if (errors[key]) setErrors((prev) => { const n = { ...prev }; delete n[key]; return n; });
   };
 
+  const blurValidateT = (key: keyof TravelerFields) => {
+    const errs = validateTraveler(tFields);
+    if (errs[key]) setErrors((prev) => ({ ...prev, [key]: errs[key] }));
+  };
+  const blurValidateA = (key: keyof AgencyFields) => {
+    const errs = validateAgency(aFields);
+    if (errs[key]) setErrors((prev) => ({ ...prev, [key]: errs[key] }));
+  };
+
   const handleSubmit = async () => {
     if (authIsLoading) return;
-    const errs = validate(role, tFields, aFields);
+    const errs = role === 'traveler' ? validateTraveler(tFields) : validateAgency(aFields);
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
 
-    const email = role === 'traveler' ? tFields.email : aFields.email;
+    const email = role === 'traveler' ? tFields.email.trim() : aFields.email.trim();
     const password = role === 'traveler' ? tFields.password : aFields.password;
     const userData = role === 'traveler'
-      ? { name: tFields.name, role: 'traveler' }
-      : { agencyName: aFields.agencyName, role: 'agency', contactPerson: aFields.contactPerson, officeAddress: aFields.officeAddress };
+      ? { name: tFields.name.trim(), phone: tFields.phone.trim(), role: 'traveler' }
+      : {
+          agencyName: aFields.agencyName.trim(),
+          role: 'agency',
+          contactPerson: aFields.contactPerson.trim(),
+          phone: aFields.phone.trim(),
+          dtsLicense: aFields.dtsLicense.trim(),
+        };
 
     setGeneralError('');
     const res: any = await register(email, password, userData);
 
     if (res.success) {
       if (res.requireLogin) {
-        // show non-blocking success confirmation and then navigate to login
         setShowCreated(true);
         Animated.timing(createdAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
-        // keep banner visible longer (2.5s) then animate out and navigate
         setTimeout(() => {
           Animated.timing(createdAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
             router.replace('/(auth)/login');
@@ -117,18 +157,13 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* Back */}
         <View style={s.header}>
           <TouchableOpacity
-            onPress={() => {
-              try {
-                if (typeof router.back === 'function') router.back();
-                else router.replace('/(auth)');
-              } catch (_) {
-                router.replace('/(auth)');
-              }
-            }}
-            hitSlop={12}
+            onPress={() => router.replace('/(auth)/login')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={s.backBtn}
+            accessibilityLabel="Go back to login"
           >
             <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
           </TouchableOpacity>
@@ -137,12 +172,13 @@ export default function RegisterScreen() {
         <Text style={s.title}>Create Account</Text>
         <Text style={s.subtitle}>Join the SAFAR community.</Text>
 
+        {/* Role toggle */}
         <View style={s.roleRow}>
           {(['traveler', 'agency'] as Role[]).map((r) => (
             <TouchableOpacity
               key={r}
               style={[s.roleBtn, role === r && s.roleBtnActive]}
-              onPress={() => { setRole(r); setErrors({}); }}
+              onPress={() => { setRole(r); setErrors({}); setGeneralError(''); }}
               accessibilityLabel={r === 'traveler' ? 'Select Traveler role' : 'Select Verified Agency role'}
             >
               <Ionicons
@@ -157,6 +193,15 @@ export default function RegisterScreen() {
           ))}
         </View>
 
+        {/* General error */}
+        {!!generalError && (
+          <View style={s.errorCard}>
+            <Ionicons name="alert-circle" size={16} color={Colors.error} />
+            <Text style={s.errorCardText}>{generalError}</Text>
+          </View>
+        )}
+
+        {/* ── Traveler Form ── */}
         {role === 'traveler' ? (
           <View style={s.form}>
             <Field label="FULL NAME" error={errors.name}>
@@ -166,9 +211,11 @@ export default function RegisterScreen() {
                 placeholderTextColor={Colors.textMuted}
                 value={tFields.name}
                 onChangeText={(v) => updateT('name', v)}
+                onBlur={() => blurValidateT('name')}
                 returnKeyType="next"
                 onSubmitEditing={() => emailRef.current?.focus()}
                 maxLength={60}
+                accessibilityLabel="Full name"
               />
             </Field>
             <Field label="EMAIL ADDRESS" error={errors.email}>
@@ -179,11 +226,28 @@ export default function RegisterScreen() {
                 placeholderTextColor={Colors.textMuted}
                 value={tFields.email}
                 onChangeText={(v) => updateT('email', v)}
+                onBlur={() => blurValidateT('email')}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 returnKeyType="next"
-                onSubmitEditing={() => passRef.current?.focus()}
+                onSubmitEditing={() => phoneRef.current?.focus()}
                 maxLength={80}
+                accessibilityLabel="Email address"
+              />
+            </Field>
+            <Field label="PHONE (OPTIONAL)" error={errors.phone}>
+              <TextInput
+                ref={phoneRef}
+                style={[s.input, !!errors.phone && s.inputError]}
+                placeholder="+92 300 0000000"
+                placeholderTextColor={Colors.textMuted}
+                value={tFields.phone}
+                onChangeText={(v) => updateT('phone', v)}
+                keyboardType="phone-pad"
+                returnKeyType="next"
+                onSubmitEditing={() => passRef.current?.focus()}
+                maxLength={20}
+                accessibilityLabel="Phone number"
               />
             </Field>
             <Field label="PASSWORD" error={errors.password}>
@@ -195,12 +259,14 @@ export default function RegisterScreen() {
                   placeholderTextColor={Colors.textMuted}
                   value={tFields.password}
                   onChangeText={(v) => updateT('password', v)}
+                  onBlur={() => blurValidateT('password')}
                   secureTextEntry={!showPass}
                   returnKeyType="next"
                   onSubmitEditing={() => confirmRef.current?.focus()}
-                  maxLength={32}
+                  maxLength={128}
+                  accessibilityLabel="Password"
                 />
-                <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPass((p) => !p)} hitSlop={12}>
+                <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPass((p) => !p)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textMuted} />
                 </TouchableOpacity>
               </View>
@@ -213,14 +279,17 @@ export default function RegisterScreen() {
                 placeholderTextColor={Colors.textMuted}
                 value={tFields.confirm}
                 onChangeText={(v) => updateT('confirm', v)}
+                onBlur={() => blurValidateT('confirm')}
                 secureTextEntry={!showPass}
                 returnKeyType="done"
                 onSubmitEditing={handleSubmit}
-                maxLength={32}
+                maxLength={128}
+                accessibilityLabel="Confirm password"
               />
             </Field>
           </View>
         ) : (
+          /* ── Agency Form ── */
           <View style={s.form}>
             <Field label="AGENCY NAME" error={errors.agencyName}>
               <TextInput
@@ -229,7 +298,11 @@ export default function RegisterScreen() {
                 placeholderTextColor={Colors.textMuted}
                 value={aFields.agencyName}
                 onChangeText={(v) => updateA('agencyName', v)}
+                onBlur={() => blurValidateA('agencyName')}
+                returnKeyType="next"
+                onSubmitEditing={() => aEmailRef.current?.focus()}
                 maxLength={80}
+                accessibilityLabel="Agency name"
               />
             </Field>
             <Field label="CONTACT PERSON" error={errors.contactPerson}>
@@ -239,36 +312,44 @@ export default function RegisterScreen() {
                 placeholderTextColor={Colors.textMuted}
                 value={aFields.contactPerson}
                 onChangeText={(v) => updateA('contactPerson', v)}
+                onBlur={() => blurValidateA('contactPerson')}
+                returnKeyType="next"
+                onSubmitEditing={() => aEmailRef.current?.focus()}
                 maxLength={60}
+                accessibilityLabel="Contact person"
               />
             </Field>
             <Field label="BUSINESS EMAIL" error={errors.email}>
               <TextInput
+                ref={aEmailRef}
                 style={[s.input, !!errors.email && s.inputError]}
                 placeholder="info@agency.com"
                 placeholderTextColor={Colors.textMuted}
                 value={aFields.email}
                 onChangeText={(v) => updateA('email', v)}
+                onBlur={() => blurValidateA('email')}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                returnKeyType="next"
+                onSubmitEditing={() => aPhoneRef.current?.focus()}
                 maxLength={80}
+                accessibilityLabel="Business email"
               />
             </Field>
-            <Field label="PASSWORD" error={errors.password}>
-              <View style={s.passWrap}>
-                <TextInput
-                  style={[s.input, s.passInput, !!errors.password && s.inputError]}
-                  placeholder="Min. 8 characters"
-                  placeholderTextColor={Colors.textMuted}
-                  value={aFields.password}
-                  onChangeText={(v) => updateA('password', v)}
-                  secureTextEntry={!showPass}
-                  maxLength={32}
-                />
-                <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPass((p) => !p)} hitSlop={12}>
-                  <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textMuted} />
-                </TouchableOpacity>
-              </View>
+            <Field label="PHONE (OPTIONAL)" error={errors.phone}>
+              <TextInput
+                ref={aPhoneRef}
+                style={[s.input, !!errors.phone && s.inputError]}
+                placeholder="+92 21 0000000"
+                placeholderTextColor={Colors.textMuted}
+                value={aFields.phone}
+                onChangeText={(v) => updateA('phone', v)}
+                keyboardType="phone-pad"
+                returnKeyType="next"
+                onSubmitEditing={() => aPassRef.current?.focus()}
+                maxLength={20}
+                accessibilityLabel="Phone number"
+              />
             </Field>
             <Field label="DTS LICENSE NO. (OPTIONAL)" error={errors.dtsLicense}>
               <TextInput
@@ -278,36 +359,38 @@ export default function RegisterScreen() {
                 value={aFields.dtsLicense}
                 onChangeText={(v) => updateA('dtsLicense', v)}
                 maxLength={40}
+                accessibilityLabel="DTS license number"
               />
             </Field>
-            <Field label="BANK CERTIFICATE / FINCEN (OPTIONAL)" error={errors.bankCert}>
-              <TextInput
-                style={[s.input, !!errors.bankCert && s.inputError]}
-                placeholder="Certificate reference number"
-                placeholderTextColor={Colors.textMuted}
-                value={aFields.bankCert}
-                onChangeText={(v) => updateA('bankCert', v)}
-                maxLength={60}
-              />
-            </Field>
-            <Field label="OFFICE ADDRESS" error={errors.officeAddress}>
-              <TextInput
-                style={[s.input, s.textArea, !!errors.officeAddress && s.inputError]}
-                placeholder="Full street address, city, region"
-                placeholderTextColor={Colors.textMuted}
-                value={aFields.officeAddress}
-                onChangeText={(v) => updateA('officeAddress', v)}
-                multiline
-                maxLength={120}
-              />
+            <Field label="PASSWORD" error={errors.password}>
+              <View style={s.passWrap}>
+                <TextInput
+                  ref={aPassRef}
+                  style={[s.input, s.passInput, !!errors.password && s.inputError]}
+                  placeholder="Min. 8 characters"
+                  placeholderTextColor={Colors.textMuted}
+                  value={aFields.password}
+                  onChangeText={(v) => updateA('password', v)}
+                  onBlur={() => blurValidateA('password')}
+                  secureTextEntry={!showPass}
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit}
+                  maxLength={128}
+                  accessibilityLabel="Password"
+                />
+                <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPass((p) => !p)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textMuted} />
+                </TouchableOpacity>
+              </View>
             </Field>
           </View>
         )}
 
+        {/* Submit */}
         <TouchableOpacity
-          style={[s.submitBtn, authIsLoading && s.submitBtnDisabled]}
+          style={[s.submitBtn, (!canSubmit || authIsLoading) && s.submitBtnDisabled]}
           onPress={handleSubmit}
-          disabled={authIsLoading}
+          disabled={!canSubmit || authIsLoading}
           accessibilityLabel="Create account"
         >
           {authIsLoading
@@ -316,19 +399,13 @@ export default function RegisterScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => {
-            try {
-              if (typeof router.back === 'function') router.back();
-              else router.replace('/(auth)');
-            } catch (_) {
-              router.replace('/(auth)');
-            }
-          }}
+          onPress={() => router.replace('/(auth)/login')}
           style={s.loginRow}
-          hitSlop={8}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="Already have an account? Sign in"
         >
           <Text style={s.loginBase}>
-            Already have an account?{'  '}
+            {'Already have an account?  '}
             <Text style={s.loginLink}>Sign In</Text>
           </Text>
         </TouchableOpacity>
@@ -337,12 +414,21 @@ export default function RegisterScreen() {
           <Animated.View
             style={[
               s.createdBanner,
-              { opacity: createdAnim, transform: [{ translateY: createdAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] },
+              {
+                opacity: createdAnim,
+                transform: [{
+                  translateY: createdAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }),
+                }],
+              },
             ]}
           >
-            <TouchableOpacity onPress={() => router.replace('/(auth)/login')} style={s.createdInner} accessibilityLabel="Proceed to sign in">
+            <TouchableOpacity
+              onPress={() => router.replace('/(auth)/login')}
+              style={s.createdInner}
+              accessibilityLabel="Proceed to sign in"
+            >
               <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
-              <Text style={s.createdText}>Account created — please sign in to continue</Text>
+              <Text style={s.createdText}>Account created — please sign in to continue.</Text>
             </TouchableOpacity>
           </Animated.View>
         )}
@@ -374,11 +460,8 @@ const s = StyleSheet.create({
   title: { ...Typography.h1, color: Colors.textPrimary, marginBottom: 4 },
   subtitle: { ...Typography.body, color: Colors.textSecondary, marginBottom: vscale(24) },
 
-  roleRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: vscale(20),
-  },
+  // ── Role toggle ──
+  roleRow: { flexDirection: 'row', gap: 10, marginBottom: vscale(20) },
   roleBtn: {
     flex: 1,
     flexDirection: 'row',
@@ -396,11 +479,24 @@ const s = StyleSheet.create({
   roleBtnText: { ...Typography.label, color: Colors.textSecondary },
   roleBtnTextActive: { color: Colors.textOnDark },
 
+  // ── Error banner ──
+  errorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: Colors.dangerBg,
+    borderRadius: Radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: vscale(14),
+  },
+  errorCardText: { ...Typography.caption, color: Colors.error, flex: 1 },
+
+  // ── Fields ──
   form: { gap: 4 },
   fieldGroup: { marginBottom: 14 },
   fieldLabel: {
-    fontSize: scale(9),
-    fontWeight: '600',
+    ...Typography.caption,
     color: Colors.textMuted,
     letterSpacing: 0.9,
     textTransform: 'uppercase',
@@ -418,15 +514,20 @@ const s = StyleSheet.create({
     ...Shadow.sm,
   },
   inputError: { borderColor: Colors.error },
+  inlineError: { ...Typography.caption, color: Colors.error, marginTop: 4, paddingLeft: 4 },
   passWrap: { position: 'relative' },
   passInput: { paddingRight: scale(50) },
   eyeBtn: {
-    position: 'absolute', right: 14, top: 0, bottom: 0,
-    width: 44, alignItems: 'center', justifyContent: 'center',
+    position: 'absolute',
+    right: 14,
+    top: 0,
+    bottom: 0,
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  textArea: { height: 80, textAlignVertical: 'top', paddingTop: 12 },
-  inlineError: { ...Typography.caption, color: Colors.error, marginTop: 4, paddingLeft: 4 },
 
+  // ── Submit ──
   submitBtn: {
     height: 52,
     backgroundColor: Colors.brand,
@@ -436,12 +537,13 @@ const s = StyleSheet.create({
     marginTop: vscale(8),
     marginBottom: vscale(16),
   },
-  submitBtnDisabled: { opacity: 0.6 },
+  submitBtnDisabled: { opacity: 0.45 },
   submitText: { ...Typography.h4, color: Colors.textOnDark, letterSpacing: 0.4 },
 
   loginRow: { alignItems: 'center', minHeight: 44, justifyContent: 'center' },
   loginBase: { ...Typography.body, color: Colors.textSecondary, textAlign: 'center' },
-  loginLink: { color: Colors.brand, fontWeight: '700', textDecorationLine: 'underline' },
+  loginLink: { color: Colors.brand },
+
   createdBanner: {
     width: '100%',
     backgroundColor: Colors.bgCard,
@@ -455,5 +557,5 @@ const s = StyleSheet.create({
     marginBottom: 6,
   },
   createdInner: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  createdText: { ...Typography.bodySm, color: Colors.success, marginLeft: 6 },
+  createdText: { ...Typography.bodySm, color: Colors.success, flex: 1 },
 });

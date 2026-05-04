@@ -1,6 +1,10 @@
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from './authStore';
+
+const QUEUE_STORAGE_KEY = 'safar:chat_queue';
 
 export type ChatMessage = {
   id: string;
@@ -43,6 +47,7 @@ type ChatState = {
   clearError: () => void;
   setTypingUser: (roomId: string, userId: string, name: string) => void;
   clearTypingUser: (roomId: string) => void;
+  initOfflineSync: () => void;
 };
 
 // Reconnect back-off attempts: 1s → 2s → 4s
@@ -58,6 +63,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
   typingUsers: {},
 
   clearError: () => set({ error: null }),
+
+  initOfflineSync: () => {
+    // Restore persisted queue from AsyncStorage
+    AsyncStorage.getItem(QUEUE_STORAGE_KEY).then((raw) => {
+      if (raw) {
+        try {
+          const saved: QueuedMessage[] = JSON.parse(raw);
+          if (saved.length > 0) set({ queue: saved });
+        } catch (_) {}
+      }
+    });
+
+    // Listen for network reconnection and auto-flush the queue
+    NetInfo.addEventListener((state) => {
+      if (state.isConnected) {
+        const { queue, flushQueue } = useChatStore.getState();
+        if (queue.length > 0) flushQueue();
+      }
+    });
+  },
 
   setTypingUser: (roomId, userId, name) => {
     const existing = get().typingUsers[roomId];
@@ -129,6 +154,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
         [roomId]: [...(state.messages[roomId] || []), newMsg],
       },
     }));
+
+    // Check network connectivity before attempting to send
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) {
+      // Offline — enqueue the message and persist to AsyncStorage
+      const queuedItem: QueuedMessage = { roomId, content, type, tempId };
+      const updatedQueue = [...get().queue, queuedItem];
+      set({ queue: updatedQueue });
+      try {
+        await AsyncStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(updatedQueue));
+      } catch (e) {
+        console.warn('Failed to persist chat queue:', e);
+      }
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -259,6 +299,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (queue.length === 0) return;
     const pending = [...queue];
     set({ queue: [] });
+    // Clear persisted queue immediately before sending (so failures don't re-queue)
+    try {
+      await AsyncStorage.removeItem(QUEUE_STORAGE_KEY);
+    } catch (e) {
+      console.warn('Failed to clear persisted chat queue:', e);
+    }
     for (const item of pending) {
       await sendMessage(item.roomId, item.content, item.type);
     }

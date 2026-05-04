@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Animated as RNAnimated, Linking, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Animated as RNAnimated, Linking, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { Colors, Typography, Spacing, Radius, Shadow } from "../../constants/Theme";
 import BottomTabBar from "../../components/layouts/BottomTabBar";
 import OfflineBanner from "../../components/ui/OfflineBanner";
-import { MOCK_EMERGENCY_CONTACTS, MOCK_LOCAL_AUTHORITIES } from "../../constants/mockData";
+import { useSafetyStore } from "../../stores/safetyStore";
+import { MOCK_LOCAL_AUTHORITIES } from "../../constants/mockData";
 
 const SAFETY_TOOLS = [
 	{
@@ -41,9 +42,18 @@ const SAFETY_TOOLS = [
 
 export default function SafetyCenterScreen() {
 	const router = useRouter();
-	const [sosActive, setSosActive] = useState(false);
-	const [liveShare, setLiveShare] = useState(false);
+	const { sosActive, liveShareActive, emergencyContacts, loadContacts, activateSOS, deactivateSOS, toggleLiveShare, addContact, removeContact } = useSafetyStore();
 	const pulseAnim = useRef(new RNAnimated.Value(0)).current;
+
+	// Add contact modal state
+	const [showAddModal, setShowAddModal] = useState(false);
+	const [newName, setNewName] = useState('');
+	const [newRelationship, setNewRelationship] = useState('');
+	const [newPhone, setNewPhone] = useState('');
+
+	useEffect(() => {
+		loadContacts();
+	}, []);
 
 	useEffect(() => {
 		RNAnimated.loop(
@@ -63,8 +73,8 @@ export default function SafetyCenterScreen() {
 				{
 					text: "Send SOS",
 					style: "destructive",
-					onPress: () => {
-						setSosActive(true);
+					onPress: async () => {
+						await activateSOS();
 						setTimeout(() => {
 							router.push('/flows/sos-activated');
 						}, 500);
@@ -72,6 +82,18 @@ export default function SafetyCenterScreen() {
 				},
 			],
 		);
+	};
+
+	const handleAddContact = async () => {
+		if (!newName.trim() || !newPhone.trim()) {
+			Alert.alert('Missing Fields', 'Name and phone number are required.');
+			return;
+		}
+		await addContact({ name: newName.trim(), relationship: newRelationship.trim() || 'Contact', phone: newPhone.trim() });
+		setNewName('');
+		setNewRelationship('');
+		setNewPhone('');
+		setShowAddModal(false);
 	};
 
 	const pulseShadowRadius = pulseAnim.interpolate({
@@ -125,7 +147,7 @@ export default function SafetyCenterScreen() {
 					<RNAnimated.View style={[styles.sosBtnWrap, { shadowRadius: pulseShadowRadius, shadowOpacity: pulseShadowOpacity }]}> 
 					<TouchableOpacity
 						style={[styles.sosBtn, sosActive && styles.sosBtnActive]}
-						onPress={sosActive ? () => setSosActive(false) : handleSOSPress}
+						onPress={sosActive ? () => deactivateSOS() : handleSOSPress}
 						activeOpacity={0.85}
 						accessibilityLabel="Emergency SOS action"
 					>
@@ -144,7 +166,7 @@ export default function SafetyCenterScreen() {
 						accessibilityLabel={`${tool.title} safety tool`}
 						onPress={() => {
 							if (tool.id === "live") {
-								setLiveShare(!liveShare);
+								toggleLiveShare();
 								return;
 							}
 							if (tool.id === "checkin") {
@@ -163,7 +185,7 @@ export default function SafetyCenterScreen() {
 						<View style={styles.toolBody}>
 							<Text style={styles.toolTitle}>{tool.title}</Text>
 							<Text style={styles.toolDesc}>{tool.desc}</Text>
-							{tool.id === "live" && liveShare ? (
+							{tool.id === "live" && liveShareActive ? (
 							<View style={styles.liveActiveRow}>
 								<View style={styles.liveDot} />
 								<Text style={styles.toolAction}>Live sharing is active — tap to stop</Text>
@@ -176,12 +198,33 @@ export default function SafetyCenterScreen() {
 					</Animated.View>
 				))}
 
-				<Text style={[styles.toolsLabel, { marginTop: 16 }]}>EMERGENCY CONTACTS</Text>
-				{MOCK_EMERGENCY_CONTACTS.map((contact) => (
+				<View style={styles.sectionHeader}>
+					<Text style={[styles.toolsLabel, { marginTop: 16, marginBottom: 0 }]}>EMERGENCY CONTACTS</Text>
+					<TouchableOpacity
+						style={styles.addContactBtn}
+						onPress={() => setShowAddModal(true)}
+						accessibilityLabel="Add emergency contact"
+					>
+						<Ionicons name="add" size={18} color={Colors.brand} />
+						<Text style={styles.addContactBtnText}>Add</Text>
+					</TouchableOpacity>
+				</View>
+				{emergencyContacts.length === 0 && (
+					<Text style={styles.emptyText}>No emergency contacts yet. Tap "Add" to get started.</Text>
+				)}
+				{emergencyContacts.map((contact) => (
 					<Animated.View key={contact.id} entering={FadeInUp.delay(60).duration(280)}>
 						<TouchableOpacity
 							style={styles.contactCard}
 							onPress={() => callNumber(contact.phone)}
+							onLongPress={() => Alert.alert(
+								`Remove ${contact.name}?`,
+								'This contact will be removed from your emergency list.',
+								[
+									{ text: 'Cancel' },
+									{ text: 'Remove', style: 'destructive', onPress: () => removeContact(contact.id) },
+								]
+							)}
 							accessibilityLabel={`Call ${contact.name}`}
 						>
 							<View style={styles.contactLeft}>
@@ -200,6 +243,48 @@ export default function SafetyCenterScreen() {
 						</TouchableOpacity>
 					</Animated.View>
 				))}
+
+				{/* Add Contact Modal */}
+				<Modal visible={showAddModal} transparent animationType="slide">
+					<View style={styles.modalOverlay}>
+						<View style={styles.modalCard}>
+							<Text style={styles.modalTitle}>Add Emergency Contact</Text>
+							<TextInput
+								style={styles.modalInput}
+								placeholder="Full Name"
+								placeholderTextColor={Colors.textMuted}
+								value={newName}
+								onChangeText={setNewName}
+								accessibilityLabel="Contact name"
+							/>
+							<TextInput
+								style={styles.modalInput}
+								placeholder="Relationship (e.g. Sister)"
+								placeholderTextColor={Colors.textMuted}
+								value={newRelationship}
+								onChangeText={setNewRelationship}
+								accessibilityLabel="Contact relationship"
+							/>
+							<TextInput
+								style={styles.modalInput}
+								placeholder="Phone Number"
+								placeholderTextColor={Colors.textMuted}
+								keyboardType="phone-pad"
+								value={newPhone}
+								onChangeText={setNewPhone}
+								accessibilityLabel="Contact phone"
+							/>
+							<View style={styles.modalBtns}>
+								<TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowAddModal(false)} accessibilityLabel="Cancel">
+									<Text style={styles.modalCancelText}>Cancel</Text>
+								</TouchableOpacity>
+								<TouchableOpacity style={styles.modalSaveBtn} onPress={handleAddContact} accessibilityLabel="Save contact">
+									<Text style={styles.modalSaveText}>Save</Text>
+								</TouchableOpacity>
+							</View>
+						</View>
+					</View>
+				</Modal>
 
 				<Text style={[styles.toolsLabel, { marginTop: 16 }]}>LOCAL AUTHORITIES</Text>
 				{MOCK_LOCAL_AUTHORITIES.map((auth) => (
@@ -432,4 +517,65 @@ const styles = StyleSheet.create({
 	safetyBarTrack: { flex: 1, height: 6, backgroundColor: Colors.border, borderRadius: 3 },
 	safetyBarFill: { height: 6, backgroundColor: Colors.success, borderRadius: 3 },
 	safetyBarPct: { ...Typography.label, color: Colors.textSecondary, fontSize: 11, width: 36, textAlign: "right" },
+
+	// Section header with Add button
+	sectionHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginHorizontal: Spacing.screen,
+		marginTop: 16,
+		marginBottom: 10,
+	},
+	addContactBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+	},
+	addContactBtnText: { ...Typography.label, color: Colors.brand, fontSize: 11 },
+	emptyText: { ...Typography.bodyMd, color: Colors.textMuted, marginHorizontal: Spacing.screen, marginBottom: 8 },
+
+	// Add Contact Modal
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.5)',
+		justifyContent: 'flex-end',
+	},
+	modalCard: {
+		backgroundColor: Colors.bgCard,
+		borderTopLeftRadius: Radius.xl,
+		borderTopRightRadius: Radius.xl,
+		padding: 24,
+		gap: 12,
+	},
+	modalTitle: { ...Typography.h3, color: Colors.textPrimary, marginBottom: 4 },
+	modalInput: {
+		...Typography.body,
+		color: Colors.textPrimary,
+		backgroundColor: Colors.bgMuted,
+		borderRadius: Radius.md,
+		paddingHorizontal: 14,
+		paddingVertical: 12,
+		minHeight: 44,
+	},
+	modalBtns: { flexDirection: 'row', gap: 12, marginTop: 4 },
+	modalCancelBtn: {
+		flex: 1,
+		borderRadius: Radius.button,
+		borderWidth: 1,
+		borderColor: Colors.border,
+		paddingVertical: 14,
+		alignItems: 'center',
+		minHeight: 44,
+	},
+	modalCancelText: { ...Typography.bodyMd, color: Colors.textSecondary },
+	modalSaveBtn: {
+		flex: 1,
+		borderRadius: Radius.button,
+		backgroundColor: Colors.brand,
+		paddingVertical: 14,
+		alignItems: 'center',
+		minHeight: 44,
+	},
+	modalSaveText: { ...Typography.bodyMd, color: Colors.textOnDark, fontWeight: '600' },
 });

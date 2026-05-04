@@ -9,6 +9,9 @@ export type Profile = {
   bio?: string | null;
   membership_tier?: string | null;
   profile_photo_url?: string | null;
+  followers_count?: number | null;
+  travelStyles?: string[] | null;
+  languages?: string[] | null;
 };
 
 export type TravelerProfile = {

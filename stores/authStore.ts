@@ -61,7 +61,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         return { success: false, error: msg };
       }
 
-      if (process.env.NODE_ENV !== 'production') console.log('Attempting signUp for email:', normalizedEmail);
+
 
       const { data, error } = await supabase.auth.signUp({
         email: normalizedEmail,
@@ -69,25 +69,16 @@ export const useAuthStore = create<AuthState>((set) => ({
         options: { data: userData || {} },
       });
 
-      // Debug logging to help diagnose 400 responses from the Auth endpoint
-      try {
-        // avoid noisy logs in production
-        if (process.env.NODE_ENV !== 'production') console.log('signUp response:', { data, error });
-      } catch (e) {
-        /* ignore logging errors */
-      }
+
 
       if (error) {
-        const full = JSON.stringify(error, Object.getOwnPropertyNames(error));
-        console.error('Supabase signUp error:', full, error);
         const msg = error?.message || 'Sign up failed';
-        // Friendly handling for invalid email API error
         if ((error as any)?.code === 'email_address_invalid' || /email address .* is invalid/i.test(msg)) {
           const friendly = 'The email address appears invalid. Please check and try again.';
           set({ isLoading: false, error: friendly });
           return { success: false, error: friendly };
         }
-        set({ isLoading: false, error: `${msg} (see console for details)` });
+        set({ isLoading: false, error: msg });
         return { success: false, error: msg };
       }
 
@@ -104,7 +95,6 @@ export const useAuthStore = create<AuthState>((set) => ({
 
           const { error: profileInsertError } = await supabase.from('profiles').insert(profilePayload);
           if (profileInsertError) {
-            console.warn('Warning: failed to insert profile row:', profileInsertError.message || profileInsertError);
             set({ isLoading: false, error: profileInsertError.message || String(profileInsertError) });
             return { success: true };
           }
@@ -129,7 +119,6 @@ export const useAuthStore = create<AuthState>((set) => ({
 
             const { error: agencyInsertError } = await supabase.from('agencies').insert(agencyPayload).select('id');
             if (agencyInsertError) {
-              console.warn('Warning: failed to insert agency row:', agencyInsertError.message || agencyInsertError);
               set({ isLoading: false, error: agencyInsertError.message || String(agencyInsertError) });
               return { success: true };
             }
@@ -140,7 +129,6 @@ export const useAuthStore = create<AuthState>((set) => ({
           set({ isLoading: false, error: null });
           return { success: true, requireLogin: true } as any;
         } catch (err: any) {
-          console.warn('User/profile insertion error:', err);
           set({ isLoading: false, error: err?.message || 'User created but failed to create profile/agency row' });
           return { success: true };
         }
@@ -160,8 +148,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       await supabase.auth.signOut();
       set({ session: null, user: null, isAuthenticated: false, isLoading: false, error: null });
-    } catch (err: any) {
-      console.error('Logout error:', err);
+    } catch {
       set({ isLoading: false });
     }
   },
@@ -180,7 +167,6 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ session: null, user: null, isAuthenticated: false, isLoading: false, error: null });
       }
     } catch (err: any) {
-      console.error('Session check error:', err);
       set({ isAuthenticated: false, isLoading: false, error: err?.message || 'Session check failed' });
     }
   },

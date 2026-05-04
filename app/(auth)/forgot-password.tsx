@@ -13,24 +13,62 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Radius, Spacing, Typography, scale, vscale } from '../../constants/Theme';
+import { supabase } from '../../lib/supabase';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type ScreenState = 'default' | 'loading' | 'success';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [screenState, setScreenState] = useState<ScreenState>('default');
+  const [emailTouched, setEmailTouched] = useState(false);
 
-  const handleSubmit = () => {
+  const isLoading = screenState === 'loading';
+  const submitted = screenState === 'success';
+
+  const validateEmail = (value: string): string => {
+    if (!value.trim()) return 'Email address is required.';
+    if (!EMAIL_RE.test(value.trim())) return 'Enter a valid email address.';
+    return '';
+  };
+
+  const handleBlur = () => {
+    setEmailTouched(true);
+    setEmailError(validateEmail(email));
+  };
+
+  const handleSubmit = async () => {
     if (isLoading) return;
-    if (!email.trim()) { setEmailError('Email address is required.'); return; }
-    if (!email.includes('@')) { setEmailError('Enter a valid email address.'); return; }
+    const err = validateEmail(email);
+    if (err) {
+      setEmailTouched(true);
+      setEmailError(err);
+      return;
+    }
     setEmailError('');
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setSubmitted(true);
-    }, 900);
+    setScreenState('loading');
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: undefined,
+      });
+      if (error) {
+        let msg = error.message || 'Could not send reset email. Please try again.';
+        if (msg.toLowerCase().includes('rate limit')) {
+          msg = 'Too many requests. Please wait a moment and try again.';
+        }
+        setEmailError(msg);
+        setScreenState('default');
+      } else {
+        setScreenState('success');
+      }
+    } catch (e: any) {
+      setEmailError(e?.message || 'Network error. Please check your connection and try again.');
+      setScreenState('default');
+    }
   };
 
   return (
@@ -42,7 +80,12 @@ export default function ForgotPasswordScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={s.backBtn}>
+          <TouchableOpacity
+            onPress={() => router.replace('/(auth)/login')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={s.backBtn}
+            accessibilityLabel="Go back to sign in"
+          >
             <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
@@ -61,10 +104,14 @@ export default function ForgotPasswordScreen() {
             <Ionicons name="checkmark-circle" size={40} color={Colors.success} style={s.successIcon} />
             <Text style={s.successTitle}>Check Your Inbox</Text>
             <Text style={s.successBody}>
-              A password reset link has been sent to{'\n'}
-              <Text style={s.successEmail}>{email}</Text>
+              {'A password reset link has been sent to\n'}
+              <Text style={s.successEmail}>{email.trim()}</Text>
             </Text>
-            <TouchableOpacity style={s.backToLoginBtn} onPress={() => router.replace('/(auth)/login')}>
+            <TouchableOpacity
+              style={s.backToLoginBtn}
+              onPress={() => router.replace('/(auth)/login')}
+              accessibilityLabel="Back to sign in"
+            >
               <Text style={s.backToLoginText}>Back to Sign In</Text>
             </TouchableOpacity>
           </View>
@@ -73,24 +120,29 @@ export default function ForgotPasswordScreen() {
             <View style={s.fieldGroup}>
               <Text style={s.fieldLabel}>EMAIL ADDRESS</Text>
               <TextInput
-                style={[s.input, !!emailError && s.inputError]}
+                style={[s.input, (!!emailError && emailTouched) && s.inputError]}
                 placeholder="your@email.com"
                 placeholderTextColor={Colors.textMuted}
                 value={email}
                 onChangeText={(v) => { setEmail(v); if (emailError) setEmailError(''); }}
+                onBlur={handleBlur}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 returnKeyType="done"
                 onSubmitEditing={handleSubmit}
                 maxLength={80}
+                accessibilityLabel="Email address"
               />
-              {!!emailError && <Text style={s.inlineError}>{emailError}</Text>}
+              {!!emailError && emailTouched && (
+                <Text style={s.inlineError}>{emailError}</Text>
+              )}
             </View>
 
             <TouchableOpacity
               style={[s.submitBtn, isLoading && s.submitBtnDisabled]}
               onPress={handleSubmit}
               disabled={isLoading}
+              accessibilityRole="button"
               accessibilityLabel="Send reset link"
             >
               {isLoading
@@ -98,7 +150,12 @@ export default function ForgotPasswordScreen() {
                 : <Text style={s.submitText}>Send Reset Link</Text>}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => router.back()} style={s.cancelRow} hitSlop={8}>
+            <TouchableOpacity
+              onPress={() => router.replace('/(auth)/login')}
+              style={s.cancelRow}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel="Cancel and go back to sign in"
+            >
               <Text style={s.cancelText}>Cancel</Text>
             </TouchableOpacity>
           </>
@@ -122,7 +179,7 @@ const s = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(55,27,23,0.08)',
+    backgroundColor: Colors.bgMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -131,13 +188,12 @@ const s = StyleSheet.create({
   subtitle: {
     ...Typography.body,
     color: Colors.textSecondary,
-    lineHeight: 24,
+    lineHeight: scale(24),
     marginBottom: vscale(28),
   },
   fieldGroup: { marginBottom: 20 },
   fieldLabel: {
-    fontSize: scale(9),
-    fontWeight: '600',
+    ...Typography.caption,
     color: Colors.textMuted,
     letterSpacing: 0.9,
     textTransform: 'uppercase',
@@ -163,7 +219,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
   },
-  submitBtnDisabled: { opacity: 0.6 },
+  submitBtnDisabled: { opacity: 0.45 },
   submitText: { ...Typography.h4, color: Colors.textOnDark },
   cancelRow: { alignItems: 'center', minHeight: 44, justifyContent: 'center' },
   cancelText: { ...Typography.body, color: Colors.textSecondary },
@@ -176,8 +232,13 @@ const s = StyleSheet.create({
   },
   successIcon: { marginBottom: 12 },
   successTitle: { ...Typography.h3, color: Colors.textPrimary, marginBottom: 10 },
-  successBody: { ...Typography.body, color: Colors.textSecondary, textAlign: 'center', lineHeight: 24 },
-  successEmail: { fontWeight: '700', color: Colors.textPrimary },
+  successBody: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: scale(24),
+  },
+  successEmail: { ...Typography.label, color: Colors.textPrimary },
   backToLoginBtn: {
     marginTop: 24,
     height: 48,

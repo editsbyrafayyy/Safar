@@ -8,12 +8,20 @@ import { checkConnection } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { useProfileStore } from "@/stores/profileStore";
 import { useTripStore } from "@/stores/tripStore";
+import { useChatStore } from "@/stores/chatStore";
 
 
 export default function RootLayout() {
   const { checkSession, isAuthenticated, user } = useAuthStore();
   const { loadCurrentProfile } = useProfileStore();
-  const { loadTripsForCurrentUser } = useTripStore();
+  const { loadTripsForCurrentUser, initOfflineSync: initTripSync } = useTripStore();
+  const { initOfflineSync: initChatSync } = useChatStore();
+
+  // Initialize offline queues once on mount
+  useEffect(() => {
+    initTripSync();
+    initChatSync();
+  }, []);
 
   useEffect(() => {
     checkSession();

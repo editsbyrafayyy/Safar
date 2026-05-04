@@ -132,7 +132,7 @@ export default function ExpenseScreen() {
 				<View style={styles.balanceCard}>
 					<Ionicons name="wallet-outline" size={22} color={Colors.textSecondary} style={{ marginBottom: 6 }} />
 					<Text style={styles.balanceLabel}>YOUR BALANCE</Text>
-					<Text style={[styles.balanceAmount, { color: ledger?.user_balances?.[trip?.participants?.[0]?.user_id] ?? 0 > 0 ? Colors.success : Colors.textSecondary }]}>PKR {Math.abs(ledger?.user_balances?.[trip?.participants?.[0]?.user_id] || 0).toLocaleString()}</Text>
+					<Text style={[styles.balanceAmount, { color: (ledger?.user_balances?.[trip?.participants?.[0]?.user_id || ""] ?? 0) > 0 ? Colors.success : Colors.textSecondary }]}>PKR {Math.abs(ledger?.user_balances?.[trip?.participants?.[0]?.user_id || ""] || 0).toLocaleString()}</Text>
 					<Text style={styles.pendingText}>{expenses.length} expenses</Text>
 				</View>
 
@@ -227,7 +227,7 @@ export default function ExpenseScreen() {
 
 						<Text style={styles.addFieldLabel}>PAID BY</Text>
 						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-							{["You", ...(trip?.participants?.map(p => p.name) || [])].map((m) => (
+							{["You", ...(trip?.participants?.map(p => p.name) || [])].filter((name): name is string => !!name).map((m) => (
 								<TouchableOpacity
 									key={m}
 									style={[styles.chip, paidBy === m && styles.chipActive]}
