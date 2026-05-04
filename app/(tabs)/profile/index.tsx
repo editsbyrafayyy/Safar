@@ -130,11 +130,15 @@ export default function ProfileScreen() {
           ].map((s, i) => (
             <React.Fragment key={s.label}>
               {i > 0 && <View style={styles.statDivider} />}
-              <View style={styles.statItem}>
+              <TouchableOpacity 
+                style={styles.statItem}
+                onPress={s.label === 'Followers' ? () => router.push('/(tabs)/profile/followers') : undefined}
+                activeOpacity={s.label === 'Followers' ? 0.7 : 1}
+              >
                 <Ionicons name={s.icon} size={16} color={Colors.brand} style={{ marginBottom: 4 }} />
                 <Text style={styles.statVal}>{s.val}</Text>
                 <Text style={styles.statLabel}>{s.label}</Text>
-              </View>
+              </TouchableOpacity>
             </React.Fragment>
           ))}
         </Animated.View>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Image,
   SafeAreaView,
@@ -7,11 +7,13 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/Theme';
-import { MOCK_AGENCIES, MOCK_DESTINATIONS } from '@/constants/mockData';
+import { supabase } from '@/lib/supabase';
+import { MOCK_AGENCIES } from '@/constants/mockData';
 
 const DIFFICULTY_COLOR: Record<string, string> = {
   Easy: Colors.success,
@@ -23,13 +25,46 @@ export default function DestinationDetailScreen() {
   const { destination } = useLocalSearchParams<{ destination: string }>();
   const router = useRouter();
   const [saved, setSaved] = useState(false);
+  
+  const [dest, setDest] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const dest = MOCK_DESTINATIONS.find((d) => d.id === destination);
+  useEffect(() => {
+    async function loadDestination() {
+      try {
+        const { data, error } = await supabase
+          .from('destinations')
+          .select('*')
+          .eq('id', destination)
+          .single();
+        if (error) throw error;
+        setDest(data);
+      } catch (e) {
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadDestination();
+  }, [destination]);
+
+  // For now, we still use mock agencies for the UI until agencies table is populated
   const agencies = dest
-    ? MOCK_AGENCIES.filter((a) => dest.agencyIds.includes(a.id))
+    ? MOCK_AGENCIES // Ideally filter by dest.region
     : [];
 
-  if (!dest) {
+  const galleryUrls = Array.isArray(dest?.gallery_urls) ? dest.gallery_urls : [];
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.brand} />
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !dest) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
@@ -44,7 +79,7 @@ export default function DestinationDetailScreen() {
         </View>
         <View style={styles.notFound}>
           <Ionicons name="map-outline" size={48} color={Colors.textMuted} />
-          <Text style={styles.notFoundText}>Destination not found</Text>
+          <Text style={styles.notFoundText}>Destination not found in DB</Text>
         </View>
       </SafeAreaView>
     );
@@ -54,7 +89,7 @@ export default function DestinationDetailScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.heroContainer}>
-          <Image source={{ uri: dest.heroImage }} style={styles.heroImage} />
+          <Image source={{ uri: dest.hero_image }} style={styles.heroImage} />
           <View style={styles.heroOverlay} />
           <TouchableOpacity
             onPress={() => router.replace('/(tabs)/explore')}
@@ -70,38 +105,93 @@ export default function DestinationDetailScreen() {
               <Text style={styles.regionChipText}>{dest.region}</Text>
             </View>
             <Text style={styles.heroName}>{dest.name}</Text>
+            <Text style={styles.heroCategory}>{dest.category}</Text>
             <View style={styles.chipsRow}>
               <View style={styles.chip}>
                 <Ionicons name="time-outline" size={12} color={Colors.textMuted} />
                 <Text style={styles.chipText}>{dest.duration}</Text>
               </View>
-              <View style={[styles.chip, { borderColor: DIFFICULTY_COLOR[dest.difficulty] }]}>
-                <View style={[styles.difficultyDot, { backgroundColor: DIFFICULTY_COLOR[dest.difficulty] }]} />
-                <Text style={[styles.chipText, { color: DIFFICULTY_COLOR[dest.difficulty] }]}>{dest.difficulty}</Text>
-              </View>
+              {dest.difficulty && (
+                <View style={[styles.chip, { borderColor: DIFFICULTY_COLOR[dest.difficulty] || Colors.brand }]}>
+                  <View style={[styles.difficultyDot, { backgroundColor: DIFFICULTY_COLOR[dest.difficulty] || Colors.brand }]} />
+                  <Text style={[styles.chipText, { color: DIFFICULTY_COLOR[dest.difficulty] || Colors.brand }]}>{dest.difficulty}</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
 
         <View style={styles.body}>
-          <Text style={styles.sectionLabel}>HIGHLIGHTS</Text>
-          <View style={styles.highlightsCard}>
-            {dest.highlights.map((h, i) => (
-              <View key={h} style={[styles.highlightRow, i === dest.highlights.length - 1 && styles.highlightRowLast]}>
-                <View style={styles.highlightDot} />
-                <Text style={styles.highlightText}>{h}</Text>
-              </View>
-            ))}
-          </View>
+          {dest.description ? (
+            <View style={styles.descriptionCard}>
+              <Text style={styles.descriptionLabel}>ABOUT THIS DESTINATION</Text>
+              <Text style={styles.descriptionText}>{dest.description}</Text>
+            </View>
+          ) : null}
 
-          <Text style={styles.sectionLabel}>BEST TIME TO VISIT</Text>
-          <View style={styles.monthsRow}>
-            {dest.bestMonths.map((m) => (
-              <View key={m} style={styles.monthChip}>
-                <Text style={styles.monthChipText}>{m}</Text>
+          {dest.highlights && dest.highlights.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>HIGHLIGHTS</Text>
+              <View style={styles.highlightsCard}>
+                {dest.highlights.map((h: string, i: number) => (
+                  <View key={h} style={[styles.highlightRow, i === dest.highlights.length - 1 && styles.highlightRowLast]}>
+                    <View style={styles.highlightDot} />
+                    <Text style={styles.highlightText}>{h}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            </>
+          )}
+
+          {(dest.latitude || dest.longitude || dest.altitude_m || dest.transportation_method) && (
+            <>
+              <Text style={styles.sectionLabel}>LOCATION DETAILS</Text>
+              <View style={styles.metaGrid}>
+                <View style={styles.metaCard}>
+                  <Text style={styles.metaLabel}>COORDINATES</Text>
+                  <Text style={styles.metaValue}>
+                    {dest.latitude?.toFixed?.(4) || '—'}, {dest.longitude?.toFixed?.(4) || '—'}
+                  </Text>
+                </View>
+                <View style={styles.metaCard}>
+                  <Text style={styles.metaLabel}>ALTITUDE</Text>
+                  <Text style={styles.metaValue}>{dest.altitude_m ? `${dest.altitude_m.toLocaleString()}m` : '—'}</Text>
+                </View>
+                <View style={styles.metaCard}>
+                  <Text style={styles.metaLabel}>TRANSPORT</Text>
+                  <Text style={styles.metaValue}>{dest.transportation_method || '—'}</Text>
+                </View>
+                <View style={styles.metaCard}>
+                  <Text style={styles.metaLabel}>ENTRY FEE</Text>
+                  <Text style={styles.metaValue}>{dest.entry_fee_pkr ? `PKR ${dest.entry_fee_pkr.toLocaleString()}` : '—'}</Text>
+                </View>
+              </View>
+            </>
+          )}
+
+          {dest.best_months && dest.best_months.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>BEST TIME TO VISIT</Text>
+              <View style={styles.monthsRow}>
+                {dest.best_months.map((m: string) => (
+                  <View key={m} style={styles.monthChip}>
+                    <Text style={styles.monthChipText}>{m}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+          {galleryUrls.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>GALLERY</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
+                {galleryUrls.map((url: string, index: number) => (
+                  <Image key={`${url}-${index}`} source={{ uri: url }} style={styles.galleryImage} />
+                ))}
+              </ScrollView>
+            </>
+          )}
 
           <Text style={styles.sectionLabel}>COST ESTIMATE</Text>
           <View style={styles.costCard}>
@@ -109,7 +199,7 @@ export default function DestinationDetailScreen() {
               <View style={styles.costCol}>
                 <Text style={styles.costLabel}>SOLO</Text>
                 <Text style={styles.costValue}>
-                  PKR {dest.soloEstimate.toLocaleString()}
+                  PKR {dest.solo_estimate?.toLocaleString() || 'N/A'}
                 </Text>
                 <Text style={styles.costNote}>Self-planned, per person</Text>
               </View>
@@ -117,7 +207,7 @@ export default function DestinationDetailScreen() {
               <View style={styles.costCol}>
                 <Text style={styles.costLabel}>WITH AGENCY</Text>
                 <Text style={[styles.costValue, { color: Colors.brand }]}>
-                  PKR {dest.agencyEstimate.toLocaleString()}
+                  PKR {dest.agency_estimate?.toLocaleString() || 'N/A'}
                 </Text>
                 <Text style={styles.costNote}>All-in, guided package</Text>
               </View>
@@ -218,6 +308,14 @@ const styles = StyleSheet.create({
   },
   regionChipText: { ...Typography.caption, color: Colors.textOnDark },
   heroName: { ...Typography.h1, color: Colors.textOnDark, marginBottom: 10 },
+  heroCategory: {
+    ...Typography.label,
+    color: Colors.textOnDark,
+    opacity: 0.85,
+    marginBottom: 10,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 1,
+  },
   chipsRow: { flexDirection: 'row', gap: 8 },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
@@ -241,6 +339,38 @@ const styles = StyleSheet.create({
   highlightsCard: {
     backgroundColor: Colors.bgCard, borderRadius: Radius.xl, ...Shadow.sm, overflow: 'hidden',
   },
+  descriptionCard: {
+    backgroundColor: Colors.bgCard,
+    borderRadius: Radius.xl,
+    padding: 16,
+    marginBottom: 8,
+    ...Shadow.sm,
+  },
+  descriptionLabel: {
+    ...Typography.label,
+    color: Colors.textMuted,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  descriptionText: { ...Typography.bodyMd, color: Colors.textPrimary, lineHeight: 22 },
+
+  metaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  metaCard: {
+    width: '48%',
+    backgroundColor: Colors.bgCard,
+    borderRadius: Radius.xl,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  metaLabel: { ...Typography.caption, color: Colors.textMuted, marginBottom: 4, textTransform: 'uppercase' as const },
+  metaValue: { ...Typography.bodyMd, color: Colors.textPrimary, fontWeight: '600' },
+
   highlightRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 16, paddingVertical: 14,
@@ -258,6 +388,14 @@ const styles = StyleSheet.create({
     ...Shadow.sm,
   },
   monthChipText: { ...Typography.caption, color: Colors.brand, fontWeight: '600' },
+
+  galleryRow: { gap: 10, paddingVertical: 4 },
+  galleryImage: {
+    width: 190,
+    height: 130,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.bgMuted,
+  },
 
   costCard: {
     backgroundColor: Colors.bgCard, borderRadius: Radius.xl, ...Shadow.sm, padding: 16,

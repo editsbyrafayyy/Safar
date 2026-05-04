@@ -20,6 +20,52 @@ export type NewTrip = {
   is_featured?: boolean; // added for UI
 };
 
+export type DestinationCard = {
+  id: string;
+  name: string;
+  region: string;
+  category?: string | null;
+  duration?: string | null;
+  difficulty?: string | null;
+  highlights?: string[] | null;
+  best_months?: string[] | null;
+  solo_estimate?: number | null;
+  agency_estimate?: number | null;
+  hero_image?: string | null;
+  hero_image_url?: string | null;
+  description?: string | null;
+  gallery_urls?: string[] | null;
+  entry_fee_pkr?: number | null;
+  duration_days?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  altitude_m?: number | null;
+  transportation_method?: string | null;
+};
+
+const inferDestinationCategory = (item: any): DestinationCard['category'] => {
+  if (item?.category) return item.category;
+
+  const haystack = [item?.id, item?.name, item?.region, ...(item?.highlights ?? [])]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (/(lake|lakes|saif|muluk|kachura|ratti|rama|deosai|skardu)/.test(haystack)) {
+    return 'Lakes';
+  }
+
+  if (/(desert|thar|cholistan|katpana)/.test(haystack)) {
+    return 'Desert';
+  }
+
+  if (/(heritage|ruins|fort|taxila|lahore|peshawar|mohenjo|rohtas)/.test(haystack)) {
+    return 'Heritage';
+  }
+
+  return 'Mountains';
+};
+
 export type Participant = {
   user_id: string;
   name?: string | null;
@@ -105,6 +151,8 @@ type TripState = {
   }>;
   featuredTrips: NewTrip[];
   exploreJourneys: NewTrip[];
+  featuredDestinations: DestinationCard[];
+  exploreDestinations: DestinationCard[];
   expenseQueue: QueuedExpense[];
   loadTripsForCurrentUser: () => Promise<void>;
   loadTripById: (tripId: string) => Promise<void>;
@@ -129,6 +177,8 @@ export const useTripStore = create<TripState>((set, get) => ({
   tripDetails: {},
   featuredTrips: [],
   exploreJourneys: [],
+  featuredDestinations: [],
+  exploreDestinations: [],
   expenseQueue: [],
 
   initOfflineSync: () => {
@@ -335,33 +385,60 @@ export const useTripStore = create<TripState>((set, get) => ({
   loadExploreContent: async () => {
     set({ loading: true, error: null });
     try {
-      // 1. Featured: latest upcoming trips with hero images
-      const { data: featured } = await supabase
-        .from('trips')
+      const { data: destinations, error } = await supabase
+        .from('destinations')
         .select('*')
-        .eq('status', 'Upcoming')
-        .not('hero_image_url', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(3);
+        .order('category', { ascending: true })
+        .order('name', { ascending: true });
 
-      // 2. Explore journeys: upcoming or preparing, excluding featured
-      const featuredIds = (featured ?? []).map((t: any) => t.id).filter(Boolean);
-      let journeyQuery = supabase
-        .from('trips')
-        .select('*')
-        .in('status', ['Upcoming', 'Preparing'])
-        .order('start_date', { ascending: true })
-        .limit(6);
+      if (error) throw error;
 
-      if (featuredIds.length > 0) {
-        journeyQuery = journeyQuery.not('id', 'in', `(${featuredIds.join(',')})`);
-      }
+      const destinationRows = (destinations ?? []).map((item: any): DestinationCard => ({
+        id: item.id,
+        name: item.name,
+        region: item.region,
+        category: inferDestinationCategory(item),
+        duration: item.duration ?? (item.duration_days ? `${item.duration_days} Days` : null),
+        difficulty: item.difficulty ?? null,
+        highlights: item.highlights ?? null,
+        best_months: item.best_months ?? null,
+        solo_estimate: item.solo_estimate ?? null,
+        agency_estimate: item.agency_estimate ?? null,
+        hero_image: item.hero_image ?? item.hero_image_url ?? null,
+        hero_image_url: item.hero_image_url ?? item.hero_image ?? null,
+        description: item.description ?? null,
+        gallery_urls: item.gallery_urls ?? null,
+        entry_fee_pkr: item.entry_fee_pkr ?? null,
+        duration_days: item.duration_days ?? null,
+        latitude: item.latitude ?? null,
+        longitude: item.longitude ?? null,
+        altitude_m: item.altitude_m ?? null,
+        transportation_method: item.transportation_method ?? null,
+      }));
 
-      const { data: journeys } = await journeyQuery;
+      const featuredDestinations = destinationRows.filter((item) => item.category === 'Mountains').slice(0, 1);
+      const featuredId = featuredDestinations[0]?.id;
+      const exploreDestinations = destinationRows.filter((item) => item.id !== featuredId);
 
       set({
-        featuredTrips: featured ?? [],
-        exploreJourneys: journeys ?? [],
+        featuredDestinations,
+        exploreDestinations,
+        featuredTrips: featuredDestinations.map((item) => ({
+          id: item.id,
+          owner_id: '',
+          title: item.name,
+          destination: item.region,
+          hero_image_url: item.hero_image,
+          is_featured: true,
+        })),
+        exploreJourneys: exploreDestinations.map((item) => ({
+          id: item.id,
+          owner_id: '',
+          title: item.name,
+          destination: item.region,
+          hero_image_url: item.hero_image,
+          is_featured: false,
+        })),
         loading: false,
       });
     } catch (e: any) {

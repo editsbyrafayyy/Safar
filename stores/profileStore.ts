@@ -34,6 +34,7 @@ type ProfileState = {
   loadCurrentProfile: () => Promise<void>;
   loadProfileById: (id: string) => Promise<void>;
   loadNearbyTravelers: () => Promise<void>;
+  updateProfile: (name: string, bio: string, travelStyle?: string, interestTags?: string[]) => Promise<void>;
   setProfile: (p: Partial<Profile>) => void;
   nearbyTravelers: Profile[];
   followerProfiles: Profile[];
@@ -121,6 +122,39 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       set({ nearbyTravelers: data ?? [], loading: false });
     } catch (e: any) {
       set({ error: e?.message || String(e), loading: false });
+    }
+  },
+
+  updateProfile: async (name: string, bio: string, travelStyle?: string, interestTags?: string[]) => {
+    const auth = useAuthStore.getState();
+    const userId = auth.user?.id;
+    if (!userId) throw new Error('No authenticated user');
+
+    try {
+      // Update profiles table
+      const { error: profileError } = await supabase.from('profiles').update({
+        name: name.trim(),
+        bio: bio.trim(),
+      }).eq('id', userId);
+
+      if (profileError) throw profileError;
+
+      // Update traveler_profiles table
+      if (travelStyle || interestTags) {
+        const updatePayload: any = {};
+        if (travelStyle) updatePayload.travel_style = travelStyle;
+        if (interestTags) updatePayload.interest_tags = interestTags;
+
+        const { error: travelerError } = await supabase.from('traveler_profiles').update(updatePayload).eq('user_id', userId);
+
+        if (travelerError) throw travelerError;
+      }
+
+      // Reload profile
+      await get().loadCurrentProfile();
+    } catch (e: any) {
+      set({ error: e?.message || String(e) });
+      throw e;
     }
   },
 }));

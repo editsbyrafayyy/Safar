@@ -37,11 +37,36 @@ create table matches (
   matched_at timestamptz default now()
 );
 
+-- DESTINATIONS (Master reference table for all discoverable locations)
+create table destinations (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  region text not null,
+  category text not null check (category in ('Mountains', 'Heritage', 'Desert', 'Lakes', 'Cities', 'Trekking')),
+  description text,
+  highlights text[],
+  latitude numeric,
+  longitude numeric,
+  altitude_m int,
+  difficulty text check (difficulty in ('Easy', 'Moderate', 'Challenging')),
+  best_season text,
+  duration_days int,
+  estimated_distance_km numeric,
+  entry_fee_pkr numeric,
+  transportation_method text,
+  visa_required boolean default false,
+  weather_info text,
+  hero_image_url text,
+  gallery_urls text[],
+  created_at timestamptz default now()
+);
+
 -- TRIPS
 create table trips (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid references profiles(id) on delete restrict,
   title text not null,
+  destination_id uuid references destinations(id) on delete restrict,
   destination text,
   start_date date,
   end_date date,

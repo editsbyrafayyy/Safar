@@ -13,27 +13,59 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow, Spacing, Typography } from '../constants/Theme';
+import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../stores/authStore';
+
+const MIN_CHARS = 10;
+const MAX_CHARS = 500;
 
 export default function FeedbackScreen() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [feedback, setFeedback] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = () => {
-    if (!feedback.trim()) {
-      Alert.alert('Empty Feedback', 'Please write something before submitting.');
+  const handleSubmit = async () => {
+    if (feedback.trim().length < MIN_CHARS) {
+      Alert.alert('Too Short', `Please write at least ${MIN_CHARS} characters.`);
       return;
     }
+    if (feedback.trim().length > MAX_CHARS) {
+      Alert.alert('Too Long', `Feedback must be ${MAX_CHARS} characters or fewer.`);
+      return;
+    }
+
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      const userId = user?.id;
+      if (!userId) throw new Error('No authenticated user');
+
+      const { error } = await supabase.from('notifications').insert({
+        user_id: userId,
+        type: 'FeedbackSubmitted',
+        payload: {
+          content: feedback.trim(),
+          timestamp: new Date().toISOString(),
+        },
+        read: false,
+      });
+
+      if (error) throw error;
+
       Alert.alert(
         'Thank You!',
         'Your feedback has been submitted. We read every message.',
         [{ text: 'Done', onPress: () => router.back() }]
       );
-    }, 700);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to submit feedback. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const isValid = feedback.trim().length >= MIN_CHARS && feedback.trim().length <= MAX_CHARS;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -67,16 +99,16 @@ export default function FeedbackScreen() {
           placeholder="Write your thoughts here..."
           placeholderTextColor={Colors.textMuted}
           multiline
-          maxLength={600}
+          maxLength={MAX_CHARS}
           textAlignVertical="top"
           accessibilityLabel="Feedback text"
         />
-        <Text style={styles.charCount}>{feedback.length}/600</Text>
+        <Text style={styles.charCount}>{feedback.length}/{MAX_CHARS}</Text>
 
         <TouchableOpacity
-          style={[styles.submitBtn, (isLoading || !feedback.trim()) && styles.submitBtnDisabled]}
+          style={[styles.submitBtn, (isLoading || !isValid) && styles.submitBtnDisabled]}
           onPress={handleSubmit}
-          disabled={isLoading || !feedback.trim()}
+          disabled={isLoading || !isValid}
           accessibilityLabel="Submit feedback"
         >
           {isLoading

@@ -58,8 +58,8 @@ export default function SafetyCenterScreen() {
 	useEffect(() => {
 		RNAnimated.loop(
 			RNAnimated.sequence([
-				RNAnimated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: false }),
-				RNAnimated.timing(pulseAnim, { toValue: 0, duration: 800, useNativeDriver: false }),
+				RNAnimated.timing(pulseAnim, { toValue: 1, duration: 750, useNativeDriver: false }),
+				RNAnimated.timing(pulseAnim, { toValue: 0, duration: 750, useNativeDriver: false }),
 			]),
 		).start();
 	}, [pulseAnim]);
@@ -104,6 +104,10 @@ export default function SafetyCenterScreen() {
 		inputRange: [0, 1],
 		outputRange: [0.08, 0.18],
 	});
+	const pulseScale = pulseAnim.interpolate({
+		inputRange: [0, 1],
+		outputRange: [1.0, 1.05],
+	});
 
 	const callNumber = (phone: string) => {
 		Linking.openURL(`tel:${phone}`).catch(() =>
@@ -144,7 +148,11 @@ export default function SafetyCenterScreen() {
 							Instantly notify local authorities and your emergency contacts with your live location.
 						</Text>
 					</View>
-					<RNAnimated.View style={[styles.sosBtnWrap, { shadowRadius: pulseShadowRadius, shadowOpacity: pulseShadowOpacity }]}> 
+					<RNAnimated.View style={[styles.sosBtnWrap, { 
+						shadowRadius: pulseShadowRadius, 
+						shadowOpacity: pulseShadowOpacity,
+						transform: [{ scale: pulseScale }]
+					}]}> 
 					<TouchableOpacity
 						style={[styles.sosBtn, sosActive && styles.sosBtnActive]}
 						onPress={sosActive ? () => deactivateSOS() : handleSOSPress}
