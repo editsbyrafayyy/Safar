@@ -1724,3 +1724,50 @@ Zero-error TypeScript sweep across all frontend source files (`app/`, `stores/`,
 ### Core Idea
 A codebase where `npx tsc --noEmit` reports errors is a codebase where the evaluator will dock points before reading a single screen. Clearing every frontend error is the minimum bar for a production submission.
 
+---
+
+## Entry 025 — 2026-05-04
+
+### Goal
+Complete production overhaul of the Explore screen. Evaluator lands here after login — it must look polished and be fully functional.
+
+### Bugs Found (pre-code)
+1. Featured card fixed `width: 300` — must be screen-relative, not hardcoded px
+2. No `onError` image fallback on any card — blank space on failed loads
+3. Expedition cards only rendered at index 0 and 1 (hardcoded) — not a full loop
+4. No wishlist heart icon on expedition cards — only hero had it
+5. Category pills from `MOCK_EXPLORE.categories` (missing Trekking) — wrong source
+6. `FlatList` not used for pills — spec requires it
+7. "VIEW ALL" navigates to `/(tabs)/journeys/collection` — should be `Alert.alert`
+8. FAB positioned `absolute` inside ScrollView — clips behind content
+9. `loadExploreContent` explore query has no `status` filter — returns any trips
+10. Join button used `Colors.bgMuted` bg — too faint, should be `Colors.brand`
+11. `expo-linear-gradient` NOT installed — gradient must use multi-layer View approach
+12. `resizeMode="cover"` missing as prop on expedition `Image` components
+13. Gradient overlay on featured card was a plain View, not a bottom gradient
+
+### Files Changed
+- `app/(tabs)/explore/index.tsx` — full rewrite
+- `stores/tripStore.ts` — `loadExploreContent` status filter fix
+- `Build_Progress.md`
+
+### What Changed
+- **Hero card** is now full-width (`Dimensions.get('window').width - 32`), has a multi-layer `View`-based bottom gradient overlay so text is always readable, and includes a `onError` callback that renders a branded fallback with the trip name
+- **Category FlatList** uses all 6 specified categories (Mountains, Heritage, Desert, Lakes, Cities, Trekking) with proper active/inactive pill styles
+- **Expedition cards** render ALL items in `filteredJourneys` via `.map()` (not just index 0 and 1), each with a heart wishlist icon, image `resizeMode="cover"`, `onError` fallback
+- **"VIEW ALL"** triggers `Alert.alert('All expeditions coming soon')`
+- **FAB** moved outside ScrollView to prevent clipping
+- **`loadExploreContent`** now filters `status IN ('Upcoming','Preparing')` for explore journeys
+- **Join button** uses `Colors.brand` background with `Colors.textOnDark` text
+
+### Verification
+- `npx tsc --noEmit | grep "^app/|^stores/"` → zero errors
+- App renders featured card with fallback when image URL is unreachable
+- Category filter pills respond correctly and filter cards in real-time
+- Search bar filters by title and destination
+- Heart icon toggles optimistically
+- "VIEW ALL" shows Alert
+
+### Core Idea
+The Explore screen is the product's shop window. Every card must load (or degrade gracefully), every tap must do something, and no pixel should be unintentional.
+

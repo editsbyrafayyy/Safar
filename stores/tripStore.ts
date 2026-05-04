@@ -335,8 +335,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   loadExploreContent: async () => {
     set({ loading: true, error: null });
     try {
-      // 1. Fetch Featured Trip (arbitrarily pick one upcoming trip or one marked as featured if we add the column)
-      // For now, let's pick the latest upcoming trip with a hero image
+      // 1. Featured: latest upcoming trips with hero images
       const { data: featured } = await supabase
         .from('trips')
         .select('*')
@@ -345,20 +344,25 @@ export const useTripStore = create<TripState>((set, get) => ({
         .order('created_at', { ascending: false })
         .limit(3);
 
-      // 2. Fetch Explore Journeys (other upcoming trips or agency itineraries)
-      const featuredIds = featured?.map(t => t.id) || [];
-      let query = supabase.from('trips').select('*').limit(6);
-      
-      if (featuredIds.length > 0) {
-        query = query.not('id', 'in', `(${featuredIds.join(',')})`);
-      }
-      
-      const { data: journeys } = await query;
+      // 2. Explore journeys: upcoming or preparing, excluding featured
+      const featuredIds = (featured ?? []).map((t: any) => t.id).filter(Boolean);
+      let journeyQuery = supabase
+        .from('trips')
+        .select('*')
+        .in('status', ['Upcoming', 'Preparing'])
+        .order('start_date', { ascending: true })
+        .limit(6);
 
-      set({ 
-        featuredTrips: featured ?? [], 
+      if (featuredIds.length > 0) {
+        journeyQuery = journeyQuery.not('id', 'in', `(${featuredIds.join(',')})`);
+      }
+
+      const { data: journeys } = await journeyQuery;
+
+      set({
+        featuredTrips: featured ?? [],
         exploreJourneys: journeys ?? [],
-        loading: false 
+        loading: false,
       });
     } catch (e: any) {
       set({ error: e?.message || String(e), loading: false });
